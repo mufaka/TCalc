@@ -1,0 +1,299 @@
+﻿@page
+@model TCalc.Web.Pages.ScientificModel
+@{
+    ViewData["Title"] = "Scientific Calculator";
+}
+
+<div class="row justify-content-center" x-data="scientificCalc()" x-on:keydown.window="handleKey($event)">
+    <div class="col-lg-7 col-md-9">
+        <div class="calc-container">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h1 class="calc-title mb-0">Scientific Calculator</h1>
+                <!-- Angle mode toggle -->
+                <div class="calc-angle-toggle">
+                    <button type="button" class="calc-angle-btn"
+                            :class="{ active: angleMode === 'rad' }"
+                            x-on:click="angleMode = 'rad'">RAD</button>
+                    <button type="button" class="calc-angle-btn"
+                            :class="{ active: angleMode === 'deg' }"
+                            x-on:click="angleMode = 'deg'">DEG</button>
+                </div>
+            </div>
+
+            <!-- Display -->
+            <div class="calc-display">
+                <div class="calc-expression" x-text="expression || '0'"></div>
+                <div class="d-flex align-items-end">
+                    <div id="sci-result" class="calc-answer flex-fill" x-text="answer"></div>
+                    <button type="button" class="calc-copy-btn" x-show="answer" x-cloak
+                            x-on:click="copyResult()" title="Copy result">
+                        <span x-text="copied ? '✓' : '📋'"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hidden form -->
+            <form id="sci-form"
+                  method="post"
+                  asp-page-handler="Calculate"
+                  x-ref="calcForm">
+                <input type="hidden" name="expression" x-bind:value="expression" />
+                <input type="hidden" name="angleMode" x-bind:value="angleMode" />
+            </form>
+
+            <!-- Buttons — 5-column scientific layout -->
+            <div class="calc-buttons calc-buttons-sci">
+                <!-- Row 1: second-row functions -->
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('asin(')" type="button">sin⁻¹</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('acos(')" type="button">cos⁻¹</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('atan(')" type="button">tan⁻¹</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="appendToken('e')" type="button">e</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="backspace()" type="button">⌫</button>
+
+                <!-- Row 2: trig + log -->
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('sin(')" type="button">sin</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('cos(')" type="button">cos</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('tan(')" type="button">tan</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('ln(')" type="button">ln</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('log(')" type="button">log</button>
+
+                <!-- Row 3: advanced functions -->
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('sqrt(')" type="button">√</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="appendToken('^')" type="button">xʸ</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="appendToken('!')" type="button">x!</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('abs(')" type="button">|x|</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapFn('exp(')" type="button">eˣ</button>
+
+                <!-- Row 4: parens, pi, clear -->
+                <button class="calc-btn calc-btn-fn" x-on:click="appendToken('(')" type="button">(</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="appendToken(')')" type="button">)</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="appendToken('pi')" type="button">π</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="clearEntry()" type="button">CE</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="clearAll()" type="button">C</button>
+
+                <!-- Row 5: 7 8 9 ÷ % -->
+                <button class="calc-btn" x-on:click="inputDigit('7')" type="button">7</button>
+                <button class="calc-btn" x-on:click="inputDigit('8')" type="button">8</button>
+                <button class="calc-btn" x-on:click="inputDigit('9')" type="button">9</button>
+                <button class="calc-btn calc-btn-op" x-on:click="appendToken('/')" type="button">÷</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="appendToken('%')" type="button">%</button>
+
+                <!-- Row 6: 4 5 6 × 1/x -->
+                <button class="calc-btn" x-on:click="inputDigit('4')" type="button">4</button>
+                <button class="calc-btn" x-on:click="inputDigit('5')" type="button">5</button>
+                <button class="calc-btn" x-on:click="inputDigit('6')" type="button">6</button>
+                <button class="calc-btn calc-btn-op" x-on:click="appendToken('*')" type="button">×</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="wrapExpr('1/(')" type="button">1/x</button>
+
+                <!-- Row 7: 1 2 3 − x² -->
+                <button class="calc-btn" x-on:click="inputDigit('1')" type="button">1</button>
+                <button class="calc-btn" x-on:click="inputDigit('2')" type="button">2</button>
+                <button class="calc-btn" x-on:click="inputDigit('3')" type="button">3</button>
+                <button class="calc-btn calc-btn-op" x-on:click="appendToken('-')" type="button">−</button>
+                <button class="calc-btn calc-btn-fn" x-on:click="squareExpr()" type="button">x²</button>
+
+                <!-- Row 8: ± 0 . + = -->
+                <button class="calc-btn" x-on:click="toggleSign()" type="button">±</button>
+                <button class="calc-btn" x-on:click="inputDigit('0')" type="button">0</button>
+                <button class="calc-btn" x-on:click="inputDigit('.')" type="button">.</button>
+                <button class="calc-btn calc-btn-op" x-on:click="appendToken('+')" type="button">+</button>
+                <button class="calc-btn calc-btn-eq" x-on:click="evaluate()" type="button">=</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History panel -->
+    <div class="col-lg-3 col-md-3">
+        <div class="calc-history">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">History</h6>
+                <button class="btn btn-sm btn-link p-0" x-on:click="clearHistory()" type="button"
+                        x-show="history.length > 0">Clear</button>
+            </div>
+            <div class="calc-history-list">
+                <template x-if="history.length === 0">
+                    <p class="text-muted small mb-0">No calculations yet.</p>
+                </template>
+                <template x-for="(item, i) in history" :key="i">
+                    <div class="calc-history-item" x-on:click="loadHistory(item)">
+                        <div class="calc-history-expr" x-text="item.expr"></div>
+                        <div class="calc-history-ans" x-text="'= ' + item.ans"></div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard shortcut help modal -->
+    <template x-if="showHelp">
+        <div class="tc-modal-overlay" x-on:click.self="showHelp = false" x-transition>
+            <div class="tc-modal p-4" style="max-width: 30rem; width: 90%;">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="fw-bold mb-0">⌨ Keyboard Shortcuts</h5>
+                    <button type="button" class="btn-close" x-on:click="showHelp = false"></button>
+                </div>
+                <div class="tc-formula-grid">
+                    <code>0–9, .</code><span>Enter digits</span>
+                    <code>+ − * / ^</code><span>Operators</span>
+                    <code>%</code><span>Percent / Modulo</span>
+                    <code>!</code><span>Factorial</span>
+                    <code>( )</code><span>Parentheses</span>
+                    <code>Enter =</code><span>Evaluate</span>
+                    <code>Escape</code><span>Clear all</span>
+                    <code>Backspace</code><span>Delete last character</span>
+                    <code>?</code><span>Toggle this help</span>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+
+@section Scripts {
+<script>
+    function scientificCalc() {
+        return {
+            expression: '',
+            answer: '',
+            angleMode: 'rad',
+            copied: false,
+            showHelp: false,
+            history: JSON.parse(sessionStorage.getItem('tcalc-sci-history') || '[]'),
+            _lastWasOp: false,
+
+            inputDigit(d) {
+                if (this.answer && !this._lastWasOp) {
+                    this.expression = '';
+                    this.answer = '';
+                }
+                this.expression += d;
+                this._lastWasOp = false;
+            },
+
+            appendToken(token) {
+                if (this.answer && !this.expression) {
+                    this.expression = this.answer;
+                }
+                this.expression += token;
+                this._lastWasOp = ['+', '-', '*', '/', '^', '%'].includes(token);
+            },
+
+            wrapFn(fn) {
+                // Append function name with opening paren: "sin("
+                if (this.answer && !this._lastWasOp && !this.expression) {
+                    this.expression = fn + this.answer + ')';
+                    this.answer = '';
+                    this._lastWasOp = false;
+                    return;
+                }
+                this.expression += fn;
+                this._lastWasOp = false;
+            },
+
+            wrapExpr(prefix) {
+                // Wrap entire current expression: "1/(expr)"
+                this.expression = prefix + (this.expression || '0') + ')';
+                this._lastWasOp = false;
+            },
+
+            squareExpr() {
+                this.expression = '(' + (this.expression || '0') + ')^2';
+                this._lastWasOp = false;
+            },
+
+            toggleSign() {
+                if (!this.expression) return;
+                if (this.expression.startsWith('-'))
+                    this.expression = this.expression.substring(1);
+                else
+                    this.expression = '-' + this.expression;
+            },
+
+            backspace() {
+                this.expression = this.expression.slice(0, -1);
+            },
+
+            clearEntry() {
+                this.expression = '';
+            },
+
+            clearAll() {
+                this.expression = '';
+                this.answer = '';
+            },
+
+            async evaluate() {
+                if (!this.expression) return;
+
+                const form = this.$refs.calcForm;
+                const formData = new FormData(form);
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const html = await response.text();
+
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+
+                    const valueEl = temp.querySelector('.calc-result-value');
+                    const errorEl = temp.querySelector('.calc-result-error');
+
+                    if (valueEl) {
+                        const result = valueEl.getAttribute('data-value');
+                        this.history.unshift({
+                            expr: this.expression,
+                            ans: result,
+                            mode: this.angleMode
+                        });
+                        if (this.history.length > 50) this.history.pop();
+                        sessionStorage.setItem('tcalc-sci-history', JSON.stringify(this.history));
+                        this.answer = result;
+                        this.expression = '';
+                        this._lastWasOp = false;
+                    } else if (errorEl) {
+                        this.answer = errorEl.textContent;
+                    }
+                } catch {
+                    this.answer = 'Error';
+                }
+            },
+
+            loadHistory(item) {
+                this.expression = item.expr;
+                this.answer = item.ans;
+                if (item.mode) this.angleMode = item.mode;
+            },
+
+            clearHistory() {
+                this.history = [];
+                sessionStorage.removeItem('tcalc-sci-history');
+            },
+
+            handleKey(e) {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                const key = e.key;
+                if (key === '?') { this.showHelp = !this.showHelp; e.preventDefault(); return; }
+                if (/^[0-9.]$/.test(key)) { this.inputDigit(key); e.preventDefault(); }
+                else if (['+', '-', '*', '/', '^', '%'].includes(key)) { this.appendToken(key); e.preventDefault(); }
+                else if (key === '(' || key === ')') { this.appendToken(key); e.preventDefault(); }
+                else if (key === '!') { this.appendToken('!'); e.preventDefault(); }
+                else if (key === 'Enter' || key === '=') { this.evaluate(); e.preventDefault(); }
+                else if (key === 'Escape') { this.showHelp ? (this.showHelp = false) : this.clearAll(); e.preventDefault(); }
+                else if (key === 'Backspace') { this.backspace(); e.preventDefault(); }
+            },
+
+            async copyResult() {
+                if (!this.answer) return;
+                try {
+                    await navigator.clipboard.writeText(this.answer);
+                    this.copied = true;
+                    setTimeout(() => this.copied = false, 1500);
+                } catch { /* clipboard API may fail in insecure contexts */ }
+            }
+        };
+    }
+</script>
+}

@@ -1,0 +1,20 @@
+﻿@page "{statusCode?}"
+@model ErrorModel
+@{
+    ViewData["Title"] = Model.ErrorTitle;
+}
+
+<div class="container text-center py-5">
+    <h1 class="display-1 fw-bold" style="color: var(--tc-accent);">@Model.StatusCode</h1>
+    <h2 class="mb-3">@Model.ErrorTitle</h2>
+    <p class="lead mb-4" style="color: var(--tc-text-muted);">@Model.ErrorMessage</p>
+
+    @if (Model.ShowRequestId)
+    {
+        <p class="small" style="color: var(--tc-text-muted);">
+            <strong>Request ID:</strong> <code>@Model.RequestId</code>
+        </p>
+    }
+
+    <a href="/" class="btn btn-primary mt-3">Back to Home</a>
+</div>

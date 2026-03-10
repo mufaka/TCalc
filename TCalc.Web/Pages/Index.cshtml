@@ -1,0 +1,48 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<section class="tc-hero">
+    <h1 class="tc-hero-title">TCalc</h1>
+    <p class="tc-hero-subtitle">A powerful web calculator — standard, scientific, graphing, geometry, and statistics all in one place.</p>
+</section>
+
+<div class="row g-4 mt-2 justify-content-center">
+    <div class="col-6 col-md-4 col-xl-2">
+        <a asp-page="/Standard" class="tc-card">
+            <span class="tc-card-icon">🧮</span>
+            <span class="tc-card-label">Standard</span>
+            <span class="tc-card-desc">Arithmetic basics</span>
+        </a>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <a asp-page="/Scientific" class="tc-card">
+            <span class="tc-card-icon">🔬</span>
+            <span class="tc-card-label">Scientific</span>
+            <span class="tc-card-desc">Trig, log &amp; more</span>
+        </a>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <a asp-page="/Graphing" class="tc-card">
+            <span class="tc-card-icon">📈</span>
+            <span class="tc-card-label">Graphing</span>
+            <span class="tc-card-desc">Plot &amp; visualise</span>
+        </a>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <a asp-page="/Geometry" class="tc-card">
+            <span class="tc-card-icon">📐</span>
+            <span class="tc-card-label">Geometry</span>
+            <span class="tc-card-desc">Shapes &amp; volumes</span>
+        </a>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <a asp-page="/Statistics" class="tc-card">
+            <span class="tc-card-icon">📊</span>
+            <span class="tc-card-label">Statistics</span>
+            <span class="tc-card-desc">Data &amp; regression</span>
+        </a>
+    </div>
+</div>

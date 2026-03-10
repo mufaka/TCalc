@@ -1,0 +1,93 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1b6ec2" />
+    <title>@ViewData["Title"] - TCalc</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/TCalc.Web.styles.css" asp-append-version="true" />
+    <script>
+        (function () {
+            var theme = localStorage.getItem('tcalc-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+</head>
+<body>
+    <header>
+        <nav class="tc-navbar navbar navbar-expand-lg">
+            <div class="container d-flex align-items-center">
+                <a class="tc-brand" asp-area="" asp-page="/Index">TCalc</a>
+
+                <button class="navbar-toggler ms-auto d-lg-none" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#navContent"
+                        aria-controls="navContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="navContent">
+                    <ul class="tc-nav-pills ms-lg-4 me-auto">
+                        @{
+                            var pageName = ViewContext.RouteData.Values["page"]?.ToString() ?? "";
+                        }
+                        <li><a class="tc-pill @(pageName == "/Index" ? "active" : "")" asp-page="/Index">Home</a></li>
+                        <li><a class="tc-pill @(pageName == "/Standard" ? "active" : "")" asp-page="/Standard">Standard</a></li>
+                        <li><a class="tc-pill @(pageName == "/Scientific" ? "active" : "")" asp-page="/Scientific">Scientific</a></li>
+                        <li><a class="tc-pill @(pageName == "/Graphing" ? "active" : "")" asp-page="/Graphing">Graphing</a></li>
+                        <li><a class="tc-pill @(pageName == "/Geometry" ? "active" : "")" asp-page="/Geometry">Geometry</a></li>
+                        <li><a class="tc-pill @(pageName == "/Statistics" ? "active" : "")" asp-page="/Statistics">Statistics</a></li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li><a class="tc-pill @(pageName == "/Dashboard" ? "active" : "")" asp-page="/Dashboard">Dashboard</a></li>
+                        }
+                    </ul>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="tc-theme-toggle" type="button"
+                                x-data="{ dark: document.documentElement.getAttribute('data-theme') === 'dark' }"
+                                x-on:click="dark = !dark;
+                                            document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+                                            localStorage.setItem('tcalc-theme', dark ? 'dark' : 'light')"
+                                x-text="dark ? '☀️' : '🌙'"
+                                title="Toggle theme">
+                            🌙
+                        </button>
+                        <partial name="_LoginPartial" />
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container py-4">
+        <main role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="tc-footer">
+        <div class="container">
+            &copy; @DateTime.Now.Year TCalc &middot; <a asp-area="" asp-page="/Privacy">Privacy</a>
+        </div>
+    </footer>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        // Haptic feedback on calculator button taps (mobile)
+        document.addEventListener('pointerdown', function (e) {
+            if (e.target.closest('.calc-btn') && navigator.vibrate) {
+                navigator.vibrate(8);
+            }
+        }, { passive: true });
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

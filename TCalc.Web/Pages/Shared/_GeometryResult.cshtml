@@ -1,0 +1,29 @@
+﻿@model TCalc.Web.Services.GeometryResult
+
+@if (!Model.Success)
+{
+    <div class="alert alert-danger py-2 px-3 small">@Model.Error</div>
+}
+else
+{
+    <table class="table table-sm mb-0">
+        <tbody>
+            @if (Model.Area.HasValue)
+            {
+                <tr><th class="text-muted" style="width:40%">Area</th><td class="fw-bold">@Model.Area.Value.ToString("N6")</td></tr>
+            }
+            @if (Model.Perimeter.HasValue)
+            {
+                <tr><th class="text-muted">Perimeter</th><td class="fw-bold">@Model.Perimeter.Value.ToString("N6")</td></tr>
+            }
+            @if (Model.Volume.HasValue)
+            {
+                <tr><th class="text-muted">Volume</th><td class="fw-bold">@Model.Volume.Value.ToString("N6")</td></tr>
+            }
+            @if (Model.SurfaceArea.HasValue)
+            {
+                <tr><th class="text-muted">Surface Area</th><td class="fw-bold">@Model.SurfaceArea.Value.ToString("N6")</td></tr>
+            }
+        </tbody>
+    </table>
+}

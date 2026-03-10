@@ -1,0 +1,10 @@
+﻿@model TCalc.Web.Services.CalculationResult
+
+@if (Model.Success)
+{
+    <span class="calc-result-value" data-value="@Model.Value">@Model.Value</span>
+}
+else
+{
+    <span class="calc-result-error">@Model.Error</span>
+}

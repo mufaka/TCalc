@@ -1,0 +1,279 @@
+﻿@page
+@model TCalc.Web.Pages.GeometryModel
+@{
+    ViewData["Title"] = "Geometry Calculator";
+}
+
+<div class="row justify-content-center" x-data="geometryCalc()">
+    <div class="col-lg-5 col-md-7">
+        <div class="calc-container">
+            <h1 class="calc-title">Geometry Calculator</h1>
+
+            <!-- Shape selector -->
+            <div class="mb-3">
+                <label class="form-label small mb-1">Shape</label>
+                <select class="form-select form-select-sm" x-model="shape">
+                    <optgroup label="2-D Shapes">
+                        <option value="circle">Circle</option>
+                        <option value="triangle">Triangle</option>
+                        <option value="rectangle">Rectangle</option>
+                        <option value="square">Square</option>
+                        <option value="trapezoid">Trapezoid</option>
+                        <option value="parallelogram">Parallelogram</option>
+                        <option value="ellipse">Ellipse</option>
+                    </optgroup>
+                    <optgroup label="3-D Shapes">
+                        <option value="sphere">Sphere</option>
+                        <option value="cylinder">Cylinder</option>
+                        <option value="cone">Cone</option>
+                        <option value="cube">Cube</option>
+                        <option value="rectangular prism">Rectangular Prism</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <!-- Dynamic input fields -->
+            <div class="mb-3">
+                <template x-for="field in fields" :key="field.key">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" x-text="field.label"></label>
+                        <input type="number" class="form-control form-control-sm"
+                               x-model.number="dims[field.key]" min="0" step="any"
+                               x-on:input="autoCalculate()" />
+                    </div>
+                </template>
+            </div>
+
+            <button type="button" class="btn btn-primary w-100" x-on:click="calculate()">Calculate</button>
+
+            <!-- Results -->
+            <div id="geo-results" class="mt-3" x-html="resultHtml"></div>
+        </div>
+    </div>
+
+    <!-- SVG preview -->
+    <div class="col-lg-4 col-md-5">
+        <div class="calc-container text-center">
+            <h6 class="mb-3">Preview</h6>
+            <svg viewBox="0 0 200 200" class="geo-svg" x-html="svgContent"></svg>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden form -->
+<form id="geo-form" method="post" asp-page-handler="Calculate" style="display:none"></form>
+
+@section Scripts {
+<script>
+    function geometryCalc() {
+        const shapeDefs = {
+            'circle':             [{ key: 'radius',    label: 'Radius' }],
+            'triangle':           [{ key: 'base',      label: 'Base' }, { key: 'height', label: 'Height' }],
+            'rectangle':          [{ key: 'length',    label: 'Length' }, { key: 'width',  label: 'Width' }],
+            'square':             [{ key: 'side',      label: 'Side' }],
+            'trapezoid':          [{ key: 'base1',     label: 'Base 1' }, { key: 'base2', label: 'Base 2' }, { key: 'height', label: 'Height' }],
+            'parallelogram':      [{ key: 'base',      label: 'Base' }, { key: 'height', label: 'Height' }, { key: 'side', label: 'Side (optional)' }],
+            'ellipse':            [{ key: 'semiMajor',  label: 'Semi-major axis (a)' }, { key: 'semiMinor', label: 'Semi-minor axis (b)' }],
+            'sphere':             [{ key: 'radius',    label: 'Radius' }],
+            'cylinder':           [{ key: 'radius',    label: 'Radius' }, { key: 'height', label: 'Height' }],
+            'cone':               [{ key: 'radius',    label: 'Radius' }, { key: 'height', label: 'Height' }],
+            'cube':               [{ key: 'side',      label: 'Side' }],
+            'rectangular prism':  [{ key: 'length',    label: 'Length' }, { key: 'width', label: 'Width' }, { key: 'height', label: 'Height' }],
+        };
+
+        return {
+            shape: 'circle',
+            dims: { radius: 5 },
+            resultHtml: '',
+
+            get fields() {
+                return shapeDefs[this.shape] || [];
+            },
+
+            get svgContent() {
+                return this.generateSvg();
+            },
+
+            init() {
+                this.$watch('shape', () => {
+                    this.dims = {};
+                    this.resultHtml = '';
+                    const defs = shapeDefs[this.shape] || [];
+                    defs.forEach(f => this.dims[f.key] = 0);
+                });
+            },
+
+            autoCalculate() {
+                // Debounce would be ideal, but keep simple for now
+            },
+
+            async calculate() {
+                const form = document.getElementById('geo-form');
+                const formData = new FormData(form);
+                formData.set('shape', this.shape);
+                for (const [k, v] of Object.entries(this.dims)) {
+                    if (v !== '' && v !== undefined) formData.set(`dims[${k}]`, v);
+                }
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: formData });
+                    this.resultHtml = await resp.text();
+                } catch {
+                    this.resultHtml = '<div class="alert alert-danger py-2 px-3 small">Request failed.</div>';
+                }
+            },
+
+            generateSvg() {
+                const d = this.dims;
+                const s = this.shape;
+                const clr = 'var(--tc-primary)';
+                const mut = 'var(--tc-text-muted)';
+                const dash = 'stroke-dasharray="4"';
+                const lbl = (x, y, txt, anchor) =>
+                    `<text x="${x}" y="${y}" text-anchor="${anchor||'middle'}" fill="${mut}" font-size="11">${txt}</text>`;
+
+                switch (s) {
+                    // ─── 2-D shapes ──────────────────────────────
+                    case 'circle': {
+                        const r = Math.min(80, Math.max(20, (d.radius || 5) * 8));
+                        return `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               `<line x1="100" y1="100" x2="${100+r}" y2="100" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(100+r/2, 94, `r=${d.radius||0}`);
+                    }
+                    case 'rectangle': {
+                        const w = Math.min(160, Math.max(40, (d.length || 4) * 15));
+                        const h = Math.min(120, Math.max(30, (d.width || 3) * 15));
+                        const x = (200-w)/2, y = (200-h)/2;
+                        return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               lbl(100, y-5, d.length||0) +
+                               lbl(x-5, 100, d.width||0, 'end');
+                    }
+                    case 'square': {
+                        const sz = Math.min(140, Math.max(40, (d.side || 4) * 15));
+                        const x = (200-sz)/2, y = (200-sz)/2;
+                        return `<rect x="${x}" y="${y}" width="${sz}" height="${sz}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               lbl(100, y-5, `s=${d.side||0}`);
+                    }
+                    case 'triangle': {
+                        const bw = Math.min(160, Math.max(40, (d.base || 4) * 15));
+                        const th = Math.min(140, Math.max(30, (d.height || 3) * 15));
+                        const lx = (200-bw)/2, rx = lx+bw, by = 180, ty = by-th, mx = (lx+rx)/2;
+                        return `<polygon points="${lx},${by} ${rx},${by} ${mx},${ty}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               lbl(100, by+15, `b=${d.base||0}`) +
+                               `<line x1="${mx}" y1="${ty}" x2="${mx}" y2="${by}" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(mx+14, (ty+by)/2, `h=${d.height||0}`);
+                    }
+                    case 'trapezoid': {
+                        const b1 = Math.min(160, Math.max(60, (d.base1 || 6) * 12));
+                        const b2 = Math.min(140, Math.max(30, (d.base2 || 3) * 12));
+                        const h  = Math.min(100, Math.max(30, (d.height || 4) * 12));
+                        const by = 160, ty = by - h;
+                        const bx1 = (200-b1)/2, bx2 = bx1+b1;
+                        const tx1 = (200-b2)/2, tx2 = tx1+b2;
+                        return `<polygon points="${bx1},${by} ${bx2},${by} ${tx2},${ty} ${tx1},${ty}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               lbl(100, by+15, `b₁=${d.base1||0}`) +
+                               lbl(100, ty-5,  `b₂=${d.base2||0}`) +
+                               `<line x1="${tx1}" y1="${ty}" x2="${tx1}" y2="${by}" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(tx1-12, (ty+by)/2, `h=${d.height||0}`, 'end');
+                    }
+                    case 'parallelogram': {
+                        const bw = Math.min(140, Math.max(50, (d.base || 5) * 12));
+                        const h  = Math.min(100, Math.max(30, (d.height || 4) * 12));
+                        const sk = 25; // skew offset
+                        const by = 160, ty = by - h;
+                        const bx = (200-bw)/2;
+                        return `<polygon points="${bx},${by} ${bx+bw},${by} ${bx+bw+sk},${ty} ${bx+sk},${ty}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               lbl(bx+bw/2, by+15, `b=${d.base||0}`) +
+                               `<line x1="${bx+sk}" y1="${ty}" x2="${bx+sk}" y2="${by}" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(bx+sk-10, (ty+by)/2, `h=${d.height||0}`, 'end');
+                    }
+                    case 'ellipse': {
+                        const rx = Math.min(90, Math.max(20, (d.semiMajor || 5) * 8));
+                        const ry = Math.min(70, Math.max(15, (d.semiMinor || 3) * 8));
+                        return `<ellipse cx="100" cy="100" rx="${rx}" ry="${ry}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               `<line x1="100" y1="100" x2="${100+rx}" y2="100" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(100+rx/2, 94, `a=${d.semiMajor||0}`) +
+                               `<line x1="100" y1="100" x2="100" y2="${100-ry}" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(112, 100-ry/2, `b=${d.semiMinor||0}`);
+                    }
+
+                    // ─── 3-D shapes (isometric-style) ────────────
+                    case 'sphere': {
+                        const r = Math.min(75, Math.max(20, (d.radius || 5) * 8));
+                        return `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               `<ellipse cx="100" cy="100" rx="${r}" ry="${r*0.3}" fill="none" stroke="${clr}" stroke-width="1" stroke-dasharray="4"/>` +
+                               `<line x1="100" y1="100" x2="${100+r}" y2="100" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(100+r/2, 94, `r=${d.radius||0}`);
+                    }
+                    case 'cylinder': {
+                        const r  = Math.min(60, Math.max(15, (d.radius || 3) * 10));
+                        const ch = Math.min(110, Math.max(30, (d.height || 5) * 10));
+                        const ry = r * 0.3;
+                        const ty = 100 - ch/2, by = ty + ch;
+                        // Top ellipse
+                        return `<ellipse cx="100" cy="${ty}" rx="${r}" ry="${ry}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               // Bottom ellipse (front half solid, back half dashed)
+                               `<path d="M${100-r},${by} A${r},${ry} 0 0,0 ${100+r},${by}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               `<path d="M${100-r},${by} A${r},${ry} 0 0,1 ${100+r},${by}" fill="none" stroke="${clr}" stroke-width="1" stroke-dasharray="4"/>` +
+                               // Side lines
+                               `<line x1="${100-r}" y1="${ty}" x2="${100-r}" y2="${by}" stroke="${clr}" stroke-width="2"/>` +
+                               `<line x1="${100+r}" y1="${ty}" x2="${100+r}" y2="${by}" stroke="${clr}" stroke-width="2"/>` +
+                               // Labels
+                               `<line x1="100" y1="${ty}" x2="${100+r}" y2="${ty}" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(100+r/2, ty-6, `r=${d.radius||0}`) +
+                               lbl(100+r+10, (ty+by)/2, `h=${d.height||0}`);
+                    }
+                    case 'cone': {
+                        const r  = Math.min(60, Math.max(15, (d.radius || 3) * 10));
+                        const ch = Math.min(120, Math.max(40, (d.height || 5) * 10));
+                        const ry = r * 0.3;
+                        const by = 170, ty = by - ch;
+                        // Apex
+                        return `<line x1="100" y1="${ty}" x2="${100-r}" y2="${by}" stroke="${clr}" stroke-width="2"/>` +
+                               `<line x1="100" y1="${ty}" x2="${100+r}" y2="${by}" stroke="${clr}" stroke-width="2"/>` +
+                               // Base ellipse
+                               `<path d="M${100-r},${by} A${r},${ry} 0 0,0 ${100+r},${by}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               `<path d="M${100-r},${by} A${r},${ry} 0 0,1 ${100+r},${by}" fill="none" stroke="${clr}" stroke-width="1" stroke-dasharray="4"/>` +
+                               // Height line
+                               `<line x1="100" y1="${ty}" x2="100" y2="${by}" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(112, (ty+by)/2, `h=${d.height||0}`) +
+                               `<line x1="100" y1="${by}" x2="${100+r}" y2="${by}" stroke="${mut}" stroke-width="1" ${dash}/>` +
+                               lbl(100+r/2, by+14, `r=${d.radius||0}`);
+                    }
+                    case 'cube': {
+                        const sz = Math.min(80, Math.max(25, (d.side || 4) * 10));
+                        const off = sz * 0.4; // isometric offset
+                        // Front face
+                        const fx = 60, fy = 60 + off;
+                        return `<rect x="${fx}" y="${fy}" width="${sz}" height="${sz}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               // Top face
+                               `<polygon points="${fx},${fy} ${fx+off},${fy-off} ${fx+sz+off},${fy-off} ${fx+sz},${fy}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               // Right face
+                               `<polygon points="${fx+sz},${fy} ${fx+sz+off},${fy-off} ${fx+sz+off},${fy+sz-off} ${fx+sz},${fy+sz}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               // Hidden edges (dashed)
+                               `<line x1="${fx}" y1="${fy}" x2="${fx+off}" y2="${fy-off}" stroke="${clr}" stroke-width="1" opacity="0.3"/>` +
+                               lbl(fx+sz/2, fy+sz+15, `s=${d.side||0}`);
+                    }
+                    case 'rectangular prism': {
+                        const pw = Math.min(90, Math.max(25, (d.length || 4) * 10));
+                        const ph = Math.min(80, Math.max(20, (d.height || 3) * 10));
+                        const pd = Math.min(40, Math.max(12, (d.width  || 2) * 8));
+                        const fx = 50, fy = 50 + pd;
+                        // Front face
+                        return `<rect x="${fx}" y="${fy}" width="${pw}" height="${ph}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               // Top face
+                               `<polygon points="${fx},${fy} ${fx+pd},${fy-pd} ${fx+pw+pd},${fy-pd} ${fx+pw},${fy}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               // Right face
+                               `<polygon points="${fx+pw},${fy} ${fx+pw+pd},${fy-pd} ${fx+pw+pd},${fy+ph-pd} ${fx+pw},${fy+ph}" fill="none" stroke="${clr}" stroke-width="2"/>` +
+                               lbl(fx+pw/2, fy+ph+15, `l=${d.length||0}`) +
+                               lbl(fx-8, fy+ph/2, `h=${d.height||0}`, 'end') +
+                               lbl(fx+pw+pd/2+8, fy-pd/2, `w=${d.width||0}`);
+                    }
+                    default:
+                        return `<text x="100" y="100" text-anchor="middle" fill="${mut}" font-size="13">Select a shape</text>`;
+                }
+            }
+        };
+    }
+</script>
+}

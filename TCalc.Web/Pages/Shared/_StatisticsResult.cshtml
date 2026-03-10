@@ -1,0 +1,42 @@
+﻿@model TCalc.Web.Services.StatisticsResult
+
+@if (!Model.Success)
+{
+    <div class="alert alert-danger py-2 px-3 small">@Model.Error</div>
+}
+else
+{
+    <table class="table table-sm mb-0">
+        <tbody>
+            <tr><th class="text-muted" style="width:45%">Count</th><td class="fw-bold">@Model.Count</td></tr>
+            <tr><th class="text-muted">Sum</th><td class="fw-bold">@Model.Sum.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Mean</th><td class="fw-bold">@Model.Mean.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Median</th><td class="fw-bold">@Model.Median.ToString("G10")</td></tr>
+            <tr>
+                <th class="text-muted">Mode</th>
+                <td class="fw-bold">
+                    @if (Model.Mode.Length == 0)
+                    {
+                        <span class="text-muted fst-italic">none</span>
+                    }
+                    else
+                    {
+                        @string.Join(", ", Model.Mode.Select(m => m.ToString("G10")))
+                    }
+                </td>
+            </tr>
+            <tr><th class="text-muted">Min</th><td class="fw-bold">@Model.Min.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Max</th><td class="fw-bold">@Model.Max.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Range</th><td class="fw-bold">@Model.Range.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Variance (σ²)</th><td class="fw-bold">@Model.Variance.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Std Dev (σ)</th><td class="fw-bold">@Model.StdDev.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Sample Var (s²)</th><td class="fw-bold">@Model.SampleVariance.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Sample Std Dev (s)</th><td class="fw-bold">@Model.SampleStdDev.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Q1 (25th %ile)</th><td class="fw-bold">@Model.Q1.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Q3 (75th %ile)</th><td class="fw-bold">@Model.Q3.ToString("G10")</td></tr>
+            <tr><th class="text-muted">IQR</th><td class="fw-bold">@Model.IQR.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Skewness</th><td class="fw-bold">@Model.Skewness.ToString("G10")</td></tr>
+            <tr><th class="text-muted">Kurtosis (excess)</th><td class="fw-bold">@Model.Kurtosis.ToString("G10")</td></tr>
+        </tbody>
+    </table>
+}

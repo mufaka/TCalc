@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TCalc.Tests/TCalc.Tests.csproj" />
+  <Project Path="TCalc.Web/TCalc.Web.csproj" />
+</Solution>

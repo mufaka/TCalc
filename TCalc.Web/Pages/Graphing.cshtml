@@ -1,0 +1,636 @@
+﻿@page
+@model TCalc.Web.Pages.GraphingModel
+@{
+    ViewData["Title"] = "Graphing Calculator";
+}
+
+<div class="row" x-data="graphingCalc()">
+    <!-- Equation panel (left) -->
+    <div class="col-lg-4 col-md-5 mb-3">
+        <div class="calc-container">
+            <h1 class="calc-title">Graphing Calculator</h1>
+
+            <!-- Mode tabs -->
+            <ul class="nav nav-pills nav-fill mb-3 graph-mode-tabs">
+                <li class="nav-item">
+                    <button class="nav-link" :class="{ active: mode === 'equations' }"
+                            x-on:click="mode = 'equations'">Equations</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" :class="{ active: mode === 'transforms' }"
+                            x-on:click="mode = 'transforms'">Transforms</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" :class="{ active: mode === 'conics' }"
+                            x-on:click="mode = 'conics'">Conics</button>
+                </li>
+            </ul>
+
+            <!-- ═══ Equations mode ═══ -->
+            <div x-show="mode === 'equations'" x-cloak>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <label class="form-label small mb-0 fw-semibold">Equations / Inequalities</label>
+                        <button type="button" class="btn btn-link btn-sm p-0 ms-1 text-decoration-none"
+                                data-bs-toggle="modal" data-bs-target="#formulaHelpModal"
+                                title="Formula help">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                                <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <template x-for="(eq, i) in equations" :key="i">
+                        <div class="d-flex gap-2 mb-2 align-items-center">
+                            <input type="color" class="form-control form-control-color graph-color-picker"
+                                   x-model="eq.color" title="Line colour" />
+                            <span class="graph-eq-label text-nowrap small fw-semibold"
+                                  x-text="eq.isInequality ? '' : 'y ='"></span>
+                            <input type="text" class="form-control form-control-sm"
+                                   x-model="eq.expr" placeholder="e.g. sin(x), x^2, y < x+1"
+                                   x-on:keydown.enter="plot()" />
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    x-on:click="removeEquation(i)" x-show="equations.length > 1">&times;</button>
+                        </div>
+                    </template>
+                    <button type="button" class="btn btn-sm btn-outline-primary" x-on:click="addEquation()">
+                        + Add equation
+                    </button>
+                </div>
+
+                <!-- Range controls -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small mb-1">x min</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="xMin" step="1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">x max</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="xMax" step="1" />
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-primary w-100" x-on:click="plot()">
+                    Plot
+                </button>
+            </div>
+
+            <!-- ═══ Transforms mode ═══ -->
+            <div x-show="mode === 'transforms'" x-cloak>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Base function  y = f(x)</label>
+                    <input type="text" class="form-control form-control-sm" x-model="transform.baseExpr"
+                           placeholder="e.g. x^2, sin(x)" x-on:keydown.enter="plotTransform()" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Transformation type</label>
+                    <select class="form-select form-select-sm" x-model="transform.type">
+                        <option value="translate">Translate (shift)</option>
+                        <option value="reflect-x">Reflect across x-axis</option>
+                        <option value="reflect-y">Reflect across y-axis</option>
+                        <option value="stretch-v">Vertical stretch</option>
+                        <option value="stretch-h">Horizontal stretch</option>
+                    </select>
+                </div>
+
+                <div x-show="transform.type === 'translate'" class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small mb-1">h (horizontal shift)</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="transform.h" step="0.5" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">k (vertical shift)</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="transform.k" step="0.5" />
+                    </div>
+                </div>
+
+                <div x-show="transform.type === 'stretch-v' || transform.type === 'stretch-h'" class="mb-3">
+                    <label class="form-label small mb-1">Scale factor</label>
+                    <input type="number" class="form-control form-control-sm" x-model.number="transform.scale" step="0.5" />
+                </div>
+
+                <!-- Range controls -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small mb-1">x min</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="xMin" step="1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">x max</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="xMax" step="1" />
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-primary w-100" x-on:click="plotTransform()">
+                    Plot Transform
+                </button>
+
+                <template x-if="transformDesc">
+                    <div class="alert alert-info mt-2 py-1 px-2 small" x-text="transformDesc"></div>
+                </template>
+            </div>
+
+            <!-- ═══ Conics mode ═══ -->
+            <div x-show="mode === 'conics'" x-cloak>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Conic section type</label>
+                    <select class="form-select form-select-sm" x-model="conic.type">
+                        <option value="circle">Circle</option>
+                        <option value="ellipse">Ellipse</option>
+                        <option value="parabola">Parabola</option>
+                        <option value="hyperbola">Hyperbola</option>
+                    </select>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Center h</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="conic.h" step="0.5" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Center k</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="conic.k" step="0.5" />
+                    </div>
+                </div>
+
+                <div x-show="conic.type === 'circle'" class="mb-3">
+                    <label class="form-label small mb-1">Radius (r)</label>
+                    <input type="number" class="form-control form-control-sm" x-model.number="conic.a" step="0.5" min="0.1" />
+                </div>
+
+                <div x-show="conic.type === 'ellipse' || conic.type === 'hyperbola'" class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Semi-axis a</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="conic.a" step="0.5" min="0.1" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">Semi-axis b</label>
+                        <input type="number" class="form-control form-control-sm" x-model.number="conic.b" step="0.5" min="0.1" />
+                    </div>
+                </div>
+
+                <div x-show="conic.type === 'parabola'" class="mb-3">
+                    <label class="form-label small mb-1">Coefficient a  (y = a(x−h)² + k)</label>
+                    <input type="number" class="form-control form-control-sm" x-model.number="conic.a" step="0.25" />
+                </div>
+
+                <button type="button" class="btn btn-primary w-100" x-on:click="plotConic()">
+                    Plot Conic
+                </button>
+
+                <template x-if="conic.equation">
+                    <div class="alert alert-info mt-2 py-1 px-2 small" x-text="conic.equation"></div>
+                </template>
+
+                <!-- Feature list -->
+                <template x-if="conic.features.length > 0">
+                    <div class="mt-2">
+                        <h6 class="small fw-semibold mb-1">Key Features</h6>
+                        <ul class="list-unstyled small mb-0">
+                            <template x-for="f in conic.features" :key="f.label">
+                                <li>
+                                    <span class="fw-semibold" x-text="f.label + ':'"></span>
+                                    (<span x-text="f.x.toFixed(3)"></span>, <span x-text="f.y.toFixed(3)"></span>)
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Error / diagnostics display (shared) -->
+            <template x-if="plotError">
+                <div class="alert alert-warning mt-2 py-1 px-2 small" style="white-space: pre-line" x-text="plotError"></div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Chart canvas (right) -->
+    <div class="col-lg-8 col-md-7">
+        <div class="graph-canvas-container">
+            <canvas id="graphCanvas"></canvas>
+        </div>
+        <div class="d-flex justify-content-center gap-2 mt-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="zoomIn()">Zoom +</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="zoomOut()">Zoom −</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="resetView()">Reset</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden forms for anti-forgery tokens -->
+<form id="graph-form" method="post" asp-page-handler="Plot" style="display:none">
+    <input type="hidden" name="equations" />
+    <input type="hidden" name="xMin" />
+    <input type="hidden" name="xMax" />
+</form>
+<form id="transform-form" method="post" asp-page-handler="Transform" style="display:none">
+    <input type="hidden" name="baseExpression" />
+    <input type="hidden" name="transformType" />
+    <input type="hidden" name="paramH" />
+    <input type="hidden" name="paramK" />
+    <input type="hidden" name="paramScale" />
+    <input type="hidden" name="xMin" />
+    <input type="hidden" name="xMax" />
+</form>
+<form id="conic-form" method="post" asp-page-handler="Conic" style="display:none">
+    <input type="hidden" name="conicType" />
+    <input type="hidden" name="h" />
+    <input type="hidden" name="k" />
+    <input type="hidden" name="paramA" />
+    <input type="hidden" name="paramB" />
+</form>
+
+<!-- Formula help modal -->
+<div class="modal fade" id="formulaHelpModal" tabindex="-1" aria-labelledby="formulaHelpLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content tc-modal">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="formulaHelpLabel">Formula Reference</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <p class="text-muted small mb-3">
+                    Enter the <strong>right-hand side</strong> of <code>y = f(x)</code>, or an inequality like <code>y &lt; x^2</code>.
+                    Use <code>x</code> as the variable.
+                </p>
+
+                <h6 class="tc-modal-section-title">Basic</h6>
+                <div class="tc-formula-grid">
+                    <code>x^2</code> <span class="text-muted">parabola</span>
+                    <code>2*x + 1</code> <span class="text-muted">line (slope 2)</span>
+                    <code>1/x</code> <span class="text-muted">reciprocal</span>
+                    <code>x^3 - x</code> <span class="text-muted">cubic</span>
+                    <code>sqrt(x)</code> <span class="text-muted">square root</span>
+                    <code>abs(x)</code> <span class="text-muted">absolute value</span>
+                </div>
+
+                <h6 class="tc-modal-section-title mt-3">Trigonometry <span class="text-muted fw-normal small">(radians)</span></h6>
+                <div class="tc-formula-grid">
+                    <code>sin(x)</code> <span class="text-muted">sine</span>
+                    <code>cos(x)</code> <span class="text-muted">cosine</span>
+                    <code>tan(x)</code> <span class="text-muted">tangent</span>
+                    <code>asin(x)</code> <span class="text-muted">arc sine</span>
+                    <code>acos(x)</code> <span class="text-muted">arc cosine</span>
+                    <code>atan(x)</code> <span class="text-muted">arc tangent</span>
+                </div>
+
+                <h6 class="tc-modal-section-title mt-3">Exponential &amp; Logarithmic</h6>
+                <div class="tc-formula-grid">
+                    <code>exp(x)</code> <span class="text-muted">e<sup>x</sup></span>
+                    <code>ln(x)</code> <span class="text-muted">natural log</span>
+                    <code>log(x)</code> <span class="text-muted">log base 10</span>
+                    <code>e^x</code> <span class="text-muted">same as exp(x)</span>
+                </div>
+
+                <h6 class="tc-modal-section-title mt-3">Inequalities</h6>
+                <div class="tc-formula-grid">
+                    <code>y &lt; x^2</code> <span class="text-muted">shade below</span>
+                    <code>y &gt;= sin(x)</code> <span class="text-muted">shade above</span>
+                    <code>y &lt;= 2*x + 1</code> <span class="text-muted">inclusive</span>
+                </div>
+
+                <h6 class="tc-modal-section-title mt-3">Other Functions</h6>
+                <div class="tc-formula-grid">
+                    <code>cbrt(x)</code> <span class="text-muted">cube root</span>
+                    <code>ceil(x)</code> <span class="text-muted">ceiling</span>
+                    <code>floor(x)</code> <span class="text-muted">floor</span>
+                    <code>round(x)</code> <span class="text-muted">round</span>
+                    <code>pow(x, 3)</code> <span class="text-muted">x to the 3rd</span>
+                    <code>mod(x, 2)</code> <span class="text-muted">x mod 2</span>
+                </div>
+
+                <h6 class="tc-modal-section-title mt-3">Constants &amp; Operators</h6>
+                <div class="tc-formula-grid">
+                    <code>pi</code> or <code>π</code> <span class="text-muted">3.14159…</span>
+                    <code>e</code> <span class="text-muted">2.71828…</span>
+                    <code>+ - * / ^</code> <span class="text-muted">operators</span>
+                    <code>2x</code> <span class="text-muted">implicit multiply</span>
+                </div>
+
+                <h6 class="tc-modal-section-title mt-3">Examples</h6>
+                <ul class="list-unstyled small mb-0">
+                    <li><code>sin(x) * x</code> — damped sine</li>
+                    <li><code>x^2 - 4</code> — shifted parabola</li>
+                    <li><code>2^x</code> — exponential growth</li>
+                    <li><code>sin(2*pi*x)</code> — full wave</li>
+                    <li><code>1/(1 + exp(-x))</code> — sigmoid</li>
+                </ul>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal">Got it</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function graphingCalc() {
+        let chartInstance = null;
+        const defaultColors = [
+            '#4f6ef7', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+            '#1abc9c', '#e67e22', '#3498db', '#e91e63', '#00bcd4'
+        ];
+
+        return {
+            mode: 'equations',
+            equations: [{ expr: '', color: defaultColors[0], isInequality: false }],
+            xMin: -10,
+            xMax: 10,
+            plotError: '',
+
+            // Transform state
+            transform: { baseExpr: '', type: 'translate', h: 2, k: 1, scale: 2 },
+            transformDesc: '',
+
+            // Conic state
+            conic: { type: 'circle', h: 0, k: 0, a: 3, b: 2, equation: '', features: [] },
+
+            addEquation() {
+                const color = defaultColors[this.equations.length % defaultColors.length];
+                this.equations.push({ expr: '', color, isInequality: false });
+            },
+
+            removeEquation(i) {
+                this.equations.splice(i, 1);
+            },
+
+            // ─── Equations / Inequalities plot ───────────────────
+            async plot() {
+                this.plotError = '';
+                const exprs = this.equations.map(e => e.expr).filter(e => e.trim());
+                if (exprs.length === 0) { this.plotError = 'Enter at least one equation.'; return; }
+
+                const form = document.getElementById('graph-form');
+                const formData = new FormData(form);
+                formData.set('equations', exprs.join('\n'));
+                formData.set('xMin', this.xMin);
+                formData.set('xMax', this.xMax);
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: formData });
+                    const data = await resp.json();
+                    if (data.error) { this.plotError = data.error; return; }
+                    this.renderChart(data);
+                } catch (err) {
+                    this.plotError = 'Failed to plot: ' + err.message;
+                }
+            },
+
+            renderChart(datasets) {
+                const ctx = document.getElementById('graphCanvas').getContext('2d');
+                const chartDatasets = [];
+
+                datasets.forEach((ds, i) => {
+                    if (ds.error) {
+                        let msg = ds.expression + ': ' + ds.error;
+                        if (ds.diagnostics?.sampleSubstitution)
+                            msg += '\n  → Sample input: ' + ds.diagnostics.sampleSubstitution;
+                        this.plotError += (this.plotError ? '\n' : '') + msg;
+                        return;
+                    }
+                    if (ds.diagnostics && ds.diagnostics.errorCount > 0) {
+                        let warn = ds.expression + ': ' + ds.diagnostics.errorCount + ' of '
+                            + ds.diagnostics.totalPoints + ' points undefined';
+                        if (ds.diagnostics.sampleError)
+                            warn += ' (' + ds.diagnostics.sampleError + ')';
+                        this.plotError += (this.plotError ? '\n' : '') + warn;
+                    }
+
+                    const color = this.equations[i]?.color || defaultColors[i % defaultColors.length];
+
+                    if (ds.isInequality) {
+                        // Boundary line (dashed if exclusive)
+                        chartDatasets.push({
+                            label: ds.expression + ' (boundary)',
+                            data: ds.points.filter(p => p.y !== null).map(p => ({ x: p.x, y: p.y })),
+                            borderColor: color,
+                            borderWidth: ds.boundaryInclusive ? 2 : 2,
+                            borderDash: ds.boundaryInclusive ? [] : [6, 4],
+                            pointRadius: 0,
+                            pointHitRadius: 6,
+                            tension: 0.1,
+                            fill: ds.fillDirection === 'below' ? 'start' : 'end',
+                            backgroundColor: color + '33',
+                            showLine: true,
+                            spanGaps: false
+                        });
+                    } else {
+                        chartDatasets.push({
+                            label: ds.expression,
+                            data: ds.points.filter(p => p.y !== null).map(p => ({ x: p.x, y: p.y })),
+                            borderColor: color,
+                            backgroundColor: color + '22',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHitRadius: 6,
+                            tension: 0.1,
+                            fill: false,
+                            showLine: true,
+                            spanGaps: false
+                        });
+                    }
+                });
+
+                this._createChart(ctx, chartDatasets);
+            },
+
+            // ─── Transforms plot ─────────────────────────────────
+            async plotTransform() {
+                this.plotError = '';
+                this.transformDesc = '';
+                if (!this.transform.baseExpr.trim()) { this.plotError = 'Enter a base function.'; return; }
+
+                const form = document.getElementById('transform-form');
+                const formData = new FormData(form);
+                formData.set('baseExpression', this.transform.baseExpr);
+                formData.set('transformType', this.transform.type);
+                formData.set('paramH', this.transform.h);
+                formData.set('paramK', this.transform.k);
+                formData.set('paramScale', this.transform.scale);
+                formData.set('xMin', this.xMin);
+                formData.set('xMax', this.xMax);
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: formData });
+                    const data = await resp.json();
+                    if (data.error) { this.plotError = data.error; return; }
+                    this.transformDesc = data.transformDescription;
+
+                    const ctx = document.getElementById('graphCanvas').getContext('2d');
+                    const chartDatasets = [
+                        {
+                            label: 'f(x) = ' + data.original.expression,
+                            data: data.original.points.filter(p => p.y !== null).map(p => ({ x: p.x, y: p.y })),
+                            borderColor: '#6b7280',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            tension: 0.1,
+                            fill: false,
+                            showLine: true,
+                            spanGaps: false
+                        },
+                        {
+                            label: 'g(x) = ' + data.transformed.expression,
+                            data: data.transformed.points.filter(p => p.y !== null).map(p => ({ x: p.x, y: p.y })),
+                            borderColor: '#4f6ef7',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.1,
+                            fill: false,
+                            showLine: true,
+                            spanGaps: false
+                        }
+                    ];
+
+                    this._createChart(ctx, chartDatasets);
+                } catch (err) {
+                    this.plotError = 'Failed to plot: ' + err.message;
+                }
+            },
+
+            // ─── Conic section plot ──────────────────────────────
+            async plotConic() {
+                this.plotError = '';
+                this.conic.equation = '';
+                this.conic.features = [];
+
+                const form = document.getElementById('conic-form');
+                const formData = new FormData(form);
+                formData.set('conicType', this.conic.type);
+                formData.set('h', this.conic.h);
+                formData.set('k', this.conic.k);
+                formData.set('paramA', this.conic.a);
+                formData.set('paramB', this.conic.b);
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: formData });
+                    const data = await resp.json();
+                    if (data.error) { this.plotError = data.error; return; }
+
+                    this.conic.equation = data.equation;
+                    this.conic.features = data.features.map(f => ({ label: f.label, x: f.x, y: f.y }));
+
+                    const ctx = document.getElementById('graphCanvas').getContext('2d');
+                    const chartDatasets = [];
+                    const conicColors = ['#4f6ef7', '#e74c3c'];
+
+                    data.series.forEach((pts, si) => {
+                        chartDatasets.push({
+                            label: si === 0 ? data.equation : data.equation + ' (branch 2)',
+                            data: pts.filter(p => p.y !== null).map(p => ({ x: p.x, y: p.y })),
+                            borderColor: conicColors[si % conicColors.length],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHitRadius: 6,
+                            tension: 0,
+                            fill: false,
+                            showLine: true,
+                            spanGaps: false
+                        });
+                    });
+
+                    // Add feature points as a separate dataset
+                    if (data.features.length > 0) {
+                        chartDatasets.push({
+                            label: 'Features',
+                            data: data.features.map(f => ({ x: f.x, y: f.y })),
+                            borderColor: '#e74c3c',
+                            backgroundColor: '#e74c3c',
+                            pointRadius: 5,
+                            pointStyle: 'crossRot',
+                            pointHoverRadius: 8,
+                            showLine: false,
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const f = data.features[ctx.dataIndex];
+                                        return `${f.label}: (${f.x.toFixed(3)}, ${f.y.toFixed(3)})`;
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    this._createChart(ctx, chartDatasets);
+                } catch (err) {
+                    this.plotError = 'Failed to plot: ' + err.message;
+                }
+            },
+
+            // ─── Shared chart creation ───────────────────────────
+            _createChart(ctx, chartDatasets) {
+                if (chartInstance) chartInstance.destroy();
+
+                const style = getComputedStyle(document.documentElement);
+                const borderClr = style.getPropertyValue('--tc-border').trim() || '#e2e5ec';
+                const mutedClr = style.getPropertyValue('--tc-text-muted').trim() || '#6b7280';
+                const textClr = style.getPropertyValue('--tc-text').trim() || '#1a1a2e';
+
+                chartInstance = new Chart(ctx, {
+                    type: 'scatter',
+                    data: { datasets: chartDatasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 300 },
+                        scales: {
+                            x: {
+                                type: 'linear', position: 'center',
+                                grid: { color: borderClr },
+                                ticks: { color: mutedClr }
+                            },
+                            y: {
+                                type: 'linear', position: 'center',
+                                grid: { color: borderClr },
+                                ticks: { color: mutedClr }
+                            }
+                        },
+                        plugins: {
+                            legend: { labels: { color: textClr } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => `(${ctx.parsed.x.toFixed(3)}, ${ctx.parsed.y.toFixed(3)})`
+                                }
+                            },
+                            filler: { propagate: true }
+                        },
+                        elements: { line: { borderWidth: 2 } }
+                    }
+                });
+            },
+
+            zoomIn() {
+                const range = this.xMax - this.xMin;
+                const mid = (this.xMax + this.xMin) / 2;
+                this.xMin = mid - range / 4;
+                this.xMax = mid + range / 4;
+                this._replot();
+            },
+
+            zoomOut() {
+                const range = this.xMax - this.xMin;
+                const mid = (this.xMax + this.xMin) / 2;
+                this.xMin = mid - range;
+                this.xMax = mid + range;
+                this._replot();
+            },
+
+            resetView() {
+                this.xMin = -10;
+                this.xMax = 10;
+                this._replot();
+            },
+
+            _replot() {
+                if (this.mode === 'equations' && this.equations.some(e => e.expr.trim())) this.plot();
+                else if (this.mode === 'transforms' && this.transform.baseExpr.trim()) this.plotTransform();
+                // Conics don't depend on xMin/xMax, no re-plot needed
+            }
+        };
+    }
+</script>
+}

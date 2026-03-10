@@ -1,0 +1,20 @@
+﻿# Build output
+bin/
+obj/
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# User secrets
+secrets.json
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,144 @@
+﻿@page
+@model TCalc.Web.Pages.DashboardModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="mb-4">
+    <h1 class="calc-title mb-1">My Dashboard</h1>
+    <p class="text-muted mb-0">Manage your saved data sets and workspaces.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- Saved Data Sets                                     -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="calc-container mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0 fw-bold">📊 Saved Data Sets</h5>
+        <span class="badge bg-secondary">@Model.DataSets.Count items</span>
+    </div>
+
+    @if (Model.DataSets.Count == 0)
+    {
+        <div class="text-center text-muted py-4">
+            <div style="font-size: 2.5rem; opacity: 0.3;">📂</div>
+            <p class="small mb-0 mt-2">No saved data sets yet. Go to <a asp-page="/Statistics">Statistics</a> and save one!</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Updated</th>
+                        <th class="text-end" style="width:200px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ds in Model.DataSets)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@ds.Name</td>
+                            <td class="text-muted small">@(ds.Description ?? "—")</td>
+                            <td class="small text-muted">@ds.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <a asp-page="/Statistics" asp-route-loadId="@ds.Id"
+                                       class="btn btn-outline-primary btn-sm" title="Load into Statistics">
+                                        📊 Load
+                                    </a>
+                                    <a asp-page="/Dashboard" asp-page-handler="ExportCsv" asp-route-id="@ds.Id"
+                                       class="btn btn-outline-success btn-sm" title="Download as CSV">
+                                        ⬇ CSV
+                                    </a>
+                                    <form method="post" asp-page-handler="DeleteDataSet" class="d-inline">
+                                        <input type="hidden" name="id" value="@ds.Id" />
+                                        <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('Delete this data set?')" title="Delete">
+                                            ✕
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- Saved Workspaces                                    -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="calc-container mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0 fw-bold">🗂️ Saved Workspaces</h5>
+        <span class="badge bg-secondary">@Model.Workspaces.Count items</span>
+    </div>
+
+    @if (Model.Workspaces.Count == 0)
+    {
+        <div class="text-center text-muted py-4">
+            <div style="font-size: 2.5rem; opacity: 0.3;">📂</div>
+            <p class="small mb-0 mt-2">No saved workspaces yet. Save one from the Graphing or Statistics pages!</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Updated</th>
+                        <th class="text-end" style="width:140px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ws in Model.Workspaces)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@ws.Name</td>
+                            <td>
+                                <span class="badge @(ws.WorkspaceType == "Graphing" ? "bg-info" : "bg-warning text-dark")">
+                                    @ws.WorkspaceType
+                                </span>
+                            </td>
+                            <td class="small text-muted">@ws.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    @if (ws.WorkspaceType == "Graphing")
+                                    {
+                                        <a asp-page="/Graphing" asp-route-loadId="@ws.Id"
+                                           class="btn btn-outline-primary btn-sm" title="Load workspace">
+                                            📈 Load
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <a asp-page="/Statistics" asp-route-loadWsId="@ws.Id"
+                                           class="btn btn-outline-primary btn-sm" title="Load workspace">
+                                            📊 Load
+                                        </a>
+                                    }
+                                    <form method="post" asp-page-handler="DeleteWorkspace" class="d-inline">
+                                        <input type="hidden" name="id" value="@ws.Id" />
+                                        <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('Delete this workspace?')" title="Delete">
+                                            ✕
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

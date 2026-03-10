@@ -1,0 +1,1115 @@
+﻿@page
+@model TCalc.Web.Pages.StatisticsModel
+@{
+    ViewData["Title"] = "Statistics Calculator";
+}
+
+<div x-data="statsCalc()" x-init="initPreload()">
+    <!-- Page header -->
+    <div class="mb-4">
+        <h1 class="calc-title mb-1">Statistics Calculator</h1>
+        <p class="text-muted mb-0">Enter data manually or upload a CSV file, then explore descriptive statistics, visualizations, and regression models.</p>
+    </div>
+
+    <!-- ─── Save / Load / Export toolbar ─── -->
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div class="calc-container mb-4 py-2 px-3">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="small fw-bold text-muted text-uppercase me-1">💾 Data Management</span>
+
+                <!-- Save button -->
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        x-on:click="showSaveModal = true"
+                        :disabled="csvColumns.length === 0"
+                        title="Save current CSV data to your account">
+                    💾 Save Data Set
+                </button>
+
+                <!-- Load picker -->
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        x-on:click="loadDataSetList()"
+                        title="Load a saved data set">
+                    📂 Load Data Set
+                </button>
+
+                <!-- Export CSV -->
+                <button type="button" class="btn btn-sm btn-outline-success"
+                        x-on:click="exportCurrentCsv()"
+                        :disabled="csvColumns.length === 0"
+                        title="Download current data as CSV">
+                    ⬇ Export CSV
+                </button>
+
+                <a asp-page="/Dashboard" class="btn btn-sm btn-outline-secondary ms-auto" title="Go to Dashboard">
+                    📋 Dashboard
+                </a>
+            </div>
+
+            <!-- Save modal -->
+            <template x-if="showSaveModal">
+                <div class="mt-3 p-3 border rounded" style="background: var(--tc-bg-secondary);">
+                    <h6 class="fw-bold mb-2">Save Data Set</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-sm-6">
+                            <input type="text" class="form-control form-control-sm" placeholder="Name (required)"
+                                   x-model="saveName" />
+                        </div>
+                        <div class="col-sm-6">
+                            <input type="text" class="form-control form-control-sm" placeholder="Description (optional)"
+                                   x-model="saveDescription" />
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-primary" x-on:click="saveDataSet()"
+                                :disabled="!saveName.trim()">
+                            Save
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="showSaveModal = false">
+                            Cancel
+                        </button>
+                        <span class="small align-self-center" x-text="saveStatus"></span>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Load picker list -->
+            <template x-if="showLoadPicker">
+                <div class="mt-3 p-3 border rounded" style="background: var(--tc-bg-secondary);">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="fw-bold mb-0">Load Data Set</h6>
+                        <button type="button" class="btn-close btn-sm" x-on:click="showLoadPicker = false"></button>
+                    </div>
+                    <template x-if="savedDataSets.length === 0">
+                        <p class="small text-muted mb-0">No saved data sets found.</p>
+                    </template>
+                    <div class="list-group list-group-flush" style="max-height:200px; overflow-y:auto;">
+                        <template x-for="ds in savedDataSets" :key="ds.id">
+                            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2 px-3"
+                               :href="'?loadId=' + ds.id">
+                                <div>
+                                    <span class="fw-semibold" x-text="ds.name"></span>
+                                    <span class="small text-muted ms-2" x-text="ds.description || ''"></span>
+                                </div>
+                                <span class="badge bg-body-secondary text-body-secondary" x-text="ds.updatedAt"></span>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-light border py-2 px-3 small mb-4">
+            💡 <a asp-area="Identity" asp-page="/Account/Login">Log in</a> to save and load your data sets.
+        </div>
+    }
+
+    <!-- Global error / info banner -->
+    <template x-if="chartError">
+        <div class="alert alert-warning d-flex align-items-center py-2 px-3 small mb-3" role="alert">
+            <span class="flex-fill" x-text="chartError"></span>
+            <button type="button" class="btn-close btn-sm ms-2" aria-label="Close" x-on:click="chartError = ''"></button>
+        </div>
+    </template>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 1 — Data Input                             -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="row g-4 mb-4">
+        <!-- Manual data entry -->
+        <div class="col-lg-6">
+            <div class="calc-container h-100">
+                <div class="stat-section-header">
+                    <span class="stat-section-icon">📊</span>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Manual Data Entry</h5>
+                        <small class="text-muted">Type or paste values separated by commas, spaces, or newlines</small>
+                    </div>
+                </div>
+
+                <textarea class="form-control font-monospace stat-data-input"
+                          x-model="rawData" rows="8"
+                          placeholder="e.g.  12, 15, 18, 22, 25, 30, 35&#10;&#10;Tip: Paste a column of numbers from a spreadsheet"></textarea>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn btn-primary flex-fill" x-on:click="compute()">
+                        🔢 Compute Stats
+                    </button>
+                    <button type="button" class="btn btn-outline-primary"
+                            x-on:click="visualize()" :disabled="!rawData.trim()"
+                            title="Generate histogram and box plot">
+                        📊 Visualize
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            x-on:click="clearAll()" title="Clear all data">
+                        ✕
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CSV upload -->
+        <div class="col-lg-6">
+            <div class="calc-container h-100">
+                <div class="stat-section-header">
+                    <span class="stat-section-icon">📁</span>
+                    <div>
+                        <h5 class="mb-0 fw-bold">CSV File Upload</h5>
+                        <small class="text-muted">Upload a .csv or .txt file with a header row</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <input type="file" class="form-control" accept=".csv,.txt"
+                           x-ref="csvInput" x-on:change="uploadCsv()" />
+                </div>
+
+                <!-- Column cards after upload -->
+                <template x-if="csvColumns.length > 0">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="small fw-bold text-muted text-uppercase">Available Columns</span>
+                            <span class="badge bg-secondary" x-text="csvRowCount + ' rows loaded'"></span>
+                        </div>
+                        <div class="stat-csv-column-list">
+                            <template x-for="col in csvColumns" :key="col">
+                                <div class="stat-csv-column-card">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="fw-semibold" x-text="col"></span>
+                                        <span class="badge bg-body-secondary text-body-secondary"
+                                              x-text="(csvData[col] || []).length + ' values'"></span>
+                                    </div>
+                                    <div class="text-muted small text-truncate mb-2"
+                                         x-text="(csvData[col] || []).slice(0, 5).join(', ') + ((csvData[col] || []).length > 5 ? ' …' : '')"></div>
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        <button type="button" class="btn btn-outline-primary btn-sm stat-csv-btn"
+                                                x-on:click="useCsvColumnForAnalysis(col)"
+                                                title="Load into data entry for descriptive stats">
+                                            📊 Analyze
+                                        </button>
+                                        <button type="button" class="btn btn-outline-success btn-sm stat-csv-btn"
+                                                x-on:click="useCsvColumnForReg(col, 'x')"
+                                                title="Use as regression X values">
+                                            X ↗
+                                        </button>
+                                        <button type="button" class="btn btn-outline-warning btn-sm stat-csv-btn"
+                                                x-on:click="useCsvColumnForReg(col, 'y')"
+                                                title="Use as regression Y values">
+                                            Y ↗
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="csvColumns.length === 0">
+                    <div class="text-center text-muted py-4">
+                        <div style="font-size: 2.5rem; opacity: 0.3;">📂</div>
+                        <p class="small mb-0 mt-2">Upload a CSV file to see columns here</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 2 — Results & Visualizations               -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="row g-4 mb-4" x-show="statsHtml || showHistogram || showBoxPlot" x-cloak>
+        <!-- Descriptive statistics table -->
+        <div class="col-xl-5 col-lg-6">
+            <div class="calc-container h-100">
+                <div class="stat-section-header">
+                    <span class="stat-section-icon">📋</span>
+                    <h5 class="mb-0 fw-bold">Descriptive Statistics</h5>
+                </div>
+                <div id="stats-result" x-html="statsHtml"></div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="col-xl-7 col-lg-6">
+            <div class="calc-container h-100">
+                <div class="stat-section-header">
+                    <span class="stat-section-icon">📈</span>
+                    <h5 class="mb-0 fw-bold">Visualizations</h5>
+                </div>
+                <div class="stat-chart-container mb-3" x-show="showHistogram" x-cloak>
+                    <h6 class="small fw-bold mb-2">Histogram</h6>
+                    <canvas id="histogramCanvas"></canvas>
+                </div>
+                <div class="stat-chart-container" x-show="showBoxPlot" x-cloak>
+                    <h6 class="small fw-bold mb-2">Box Plot (Five-Number Summary)</h6>
+                    <canvas id="boxPlotCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 3 — Regression Analysis                    -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="calc-container mb-4">
+        <div class="stat-section-header">
+            <span class="stat-section-icon">📐</span>
+            <div>
+                <h5 class="mb-0 fw-bold">Regression Analysis</h5>
+                <small class="text-muted">Fit a trend line to paired (X, Y) data — type values manually or use CSV columns above</small>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Left: inputs & controls -->
+            <div class="col-lg-5">
+                <!-- Quick-fill from CSV (only visible when CSV data exists) -->
+                <template x-if="csvColumns.length > 0">
+                    <div class="stat-csv-quickfill mb-3">
+                        <p class="small fw-bold mb-2">⚡ Quick-fill from CSV</p>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small mb-1">X column</label>
+                                <div class="input-group input-group-sm">
+                                    <select class="form-select form-select-sm" x-model="csvRegXCol">
+                                        <template x-for="col in csvColumns" :key="'rx-'+col">
+                                            <option :value="col" x-text="col"></option>
+                                        </template>
+                                    </select>
+                                    <button class="btn btn-outline-success btn-sm" type="button"
+                                            x-on:click="fillRegFromCsv('x')">
+                                        Fill
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1">Y column</label>
+                                <div class="input-group input-group-sm">
+                                    <select class="form-select form-select-sm" x-model="csvRegYCol">
+                                        <template x-for="col in csvColumns" :key="'ry-'+col">
+                                            <option :value="col" x-text="col"></option>
+                                        </template>
+                                    </select>
+                                    <button class="btn btn-outline-warning btn-sm" type="button"
+                                            x-on:click="fillRegFromCsv('y')">
+                                        Fill
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold mb-1">X values</label>
+                        <textarea class="form-control font-monospace stat-data-input"
+                                  x-model="regX" rows="6"
+                                  placeholder="1, 2, 3, 4, 5"></textarea>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold mb-1">Y values</label>
+                        <textarea class="form-control font-monospace stat-data-input"
+                                  x-model="regY" rows="6"
+                                  placeholder="2.1, 4.0, 5.9, 8.1, 10.2"></textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 align-items-end mb-3">
+                    <div class="flex-fill">
+                        <label class="form-label small fw-semibold mb-1">Polynomial Degree</label>
+                        <select class="form-select" x-model.number="regDegree">
+                            <option value="1">1 — Linear</option>
+                            <option value="2">2 — Quadratic</option>
+                            <option value="3">3 — Cubic</option>
+                            <option value="4">4 — Quartic</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary" x-on:click="runRegression()">
+                        📈 Fit Model
+                    </button>
+                </div>
+
+                <!-- Regression result -->
+                <template x-if="regResult">
+                    <div class="stat-regression-result">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-success">Fitted</span>
+                            <span class="small fw-bold">Regression Result</span>
+                        </div>
+                        <div class="font-monospace fw-bold" style="font-size: .95rem;" x-text="regResult.equation"></div>
+                        <div class="small text-muted mt-1">
+                            R² = <span class="fw-bold" x-text="regResult.rSquared.toFixed(6)"></span>
+                            <span class="ms-2"
+                                  x-text="regResult.rSquared >= 0.99 ? '✨ Excellent fit' : regResult.rSquared >= 0.95 ? '👍 Good fit' : regResult.rSquared >= 0.8 ? '⚠️ Moderate fit' : '❌ Poor fit'"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Right: scatter chart -->
+            <div class="col-lg-7">
+                <div class="stat-chart-container stat-chart-container-tall" x-show="showScatter" x-cloak>
+                    <h6 class="small fw-bold mb-2">Scatter Plot &amp; Regression</h6>
+                    <canvas id="scatterCanvas"></canvas>
+                </div>
+                <template x-if="!showScatter">
+                    <div class="text-center text-muted py-5">
+                        <div style="font-size: 3rem; opacity: 0.2;">📈</div>
+                        <p class="small mb-0 mt-2">Enter X and Y data, then click <strong>Fit Model</strong> to see the scatter plot</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 4 — Probability Distributions              -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="calc-container mb-4">
+        <div class="stat-section-header">
+            <span class="stat-section-icon">🎲</span>
+            <div>
+                <h5 class="mb-0 fw-bold">Probability Distributions</h5>
+                <small class="text-muted">Normal, Binomial, and Poisson — compute probabilities and visualise PDF/PMF</small>
+            </div>
+        </div>
+
+        <!-- Distribution type selector -->
+        <div class="prob-type-selector mb-3">
+            <button type="button" class="prob-type-btn" :class="probDist === 'normal' && 'active'"
+                    x-on:click="probDist = 'normal'">Normal</button>
+            <button type="button" class="prob-type-btn" :class="probDist === 'binomial' && 'active'"
+                    x-on:click="probDist = 'binomial'">Binomial</button>
+            <button type="button" class="prob-type-btn" :class="probDist === 'poisson' && 'active'"
+                    x-on:click="probDist = 'poisson'">Poisson</button>
+        </div>
+
+        <template x-if="probDefaultsApplied">
+            <div class="alert alert-info d-flex align-items-center py-2 px-3 small mb-3">
+                <span class="flex-fill">📊 Parameters auto-filled from your dataset (μ = <span x-text="probMean"></span>, σ = <span x-text="probStdDev"></span>, n = <span x-text="probN"></span>). Adjust as needed.</span>
+                <button type="button" class="btn-close btn-sm ms-2" aria-label="Close" x-on:click="probDefaultsApplied = false"></button>
+            </div>
+        </template>
+
+        <div class="row g-4">
+            <!-- Left: inputs & results -->
+            <div class="col-lg-5">
+                <!-- Normal parameters -->
+                <template x-if="probDist === 'normal'">
+                    <div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">Mean (μ)</label>
+                                <input type="number" class="form-control" x-model.number="probMean" step="any" placeholder="0" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">Std Dev (σ)</label>
+                                <input type="number" class="form-control" x-model.number="probStdDev" step="any" min="0.001" placeholder="1" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold mb-1">
+                                Query value (x) <span class="text-muted fw-normal">— optional, computes P(X ≤ x)</span>
+                            </label>
+                            <input type="number" class="form-control" x-model="probX" step="any" placeholder="e.g. 1.96" />
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Binomial parameters -->
+                <template x-if="probDist === 'binomial'">
+                    <div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">Trials (n)</label>
+                                <input type="number" class="form-control" x-model.number="probN" min="0" max="1000" step="1" placeholder="10" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">Probability (p)</label>
+                                <input type="number" class="form-control" x-model.number="probP" min="0" max="1" step="0.01" placeholder="0.5" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold mb-1">
+                                Query value (k) <span class="text-muted fw-normal">— optional, computes P(X = k) and P(X ≤ k)</span>
+                            </label>
+                            <input type="number" class="form-control" x-model="probK" min="0" step="1" placeholder="e.g. 5" />
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Poisson parameters -->
+                <template x-if="probDist === 'poisson'">
+                    <div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">Rate (λ)</label>
+                                <input type="number" class="form-control" x-model.number="probLambda" min="0.01" max="1000" step="any" placeholder="5" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">
+                                    Query value (k) <span class="text-muted fw-normal">— optional</span>
+                                </label>
+                                <input type="number" class="form-control" x-model="probK" min="0" step="1" placeholder="e.g. 3" />
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <button type="button" class="btn btn-primary w-100 mb-3" x-on:click="computeProbability()">
+                    🎲 Compute Distribution
+                </button>
+
+                <!-- Results -->
+                <template x-if="probResult">
+                    <div class="prob-result-card">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-primary">Result</span>
+                            <span class="small fw-bold" x-text="probDist === 'normal' ? 'Normal Distribution' : probDist === 'binomial' ? 'Binomial Distribution' : 'Poisson Distribution'"></span>
+                        </div>
+
+                        <!-- Summary stats -->
+                        <div class="prob-result-stats mb-2">
+                            <template x-if="probResult.type === 'normal'">
+                                <div>
+                                    <span class="prob-stat-label">μ =</span> <span class="prob-stat-value" x-text="probResult.mean"></span>
+                                    <span class="prob-stat-label ms-3">σ =</span> <span class="prob-stat-value" x-text="probResult.stdDev"></span>
+                                </div>
+                            </template>
+                            <template x-if="probResult.type === 'binomial'">
+                                <div>
+                                    <span class="prob-stat-label">E[X] =</span> <span class="prob-stat-value" x-text="probResult.expectedValue"></span>
+                                    <span class="prob-stat-label ms-3">Var =</span> <span class="prob-stat-value" x-text="probResult.variance"></span>
+                                    <span class="prob-stat-label ms-3">σ =</span> <span class="prob-stat-value" x-text="probResult.stdDev"></span>
+                                </div>
+                            </template>
+                            <template x-if="probResult.type === 'poisson'">
+                                <div>
+                                    <span class="prob-stat-label">E[X] = λ =</span> <span class="prob-stat-value" x-text="probResult.expectedValue"></span>
+                                    <span class="prob-stat-label ms-3">Var =</span> <span class="prob-stat-value" x-text="probResult.variance"></span>
+                                    <span class="prob-stat-label ms-3">σ =</span> <span class="prob-stat-value" x-text="probResult.stdDev"></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Queried probability -->
+                        <template x-if="probResult.type === 'normal' && probResult.queriedX !== null && probResult.queriedX !== undefined">
+                            <div class="prob-query-result">
+                                <div class="small text-muted mb-1">At x = <span x-text="probResult.queriedX"></span>:</div>
+                                <div class="font-monospace">
+                                    <span class="prob-stat-label">f(x) =</span> <span class="fw-bold" x-text="probResult.pdfAtX?.toFixed(8)"></span>
+                                </div>
+                                <div class="font-monospace">
+                                    <span class="prob-stat-label">P(X ≤ x) =</span> <span class="fw-bold" x-text="probResult.cdfAtX?.toFixed(8)"></span>
+                                    <span class="text-muted ms-2" x-text="'(' + (probResult.cdfAtX * 100).toFixed(4) + '%)'"></span>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="(probResult.type === 'binomial' || probResult.type === 'poisson') && probResult.queriedK !== null && probResult.queriedK !== undefined">
+                            <div class="prob-query-result">
+                                <div class="small text-muted mb-1">At k = <span x-text="probResult.queriedK"></span>:</div>
+                                <div class="font-monospace">
+                                    <span class="prob-stat-label">P(X = k) =</span> <span class="fw-bold" x-text="probResult.pmfAtK?.toFixed(8)"></span>
+                                    <span class="text-muted ms-2" x-text="'(' + (probResult.pmfAtK * 100).toFixed(4) + '%)'"></span>
+                                </div>
+                                <div class="font-monospace">
+                                    <span class="prob-stat-label">P(X ≤ k) =</span> <span class="fw-bold" x-text="probResult.cdfAtK?.toFixed(8)"></span>
+                                    <span class="text-muted ms-2" x-text="'(' + (probResult.cdfAtK * 100).toFixed(4) + '%)'"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Right: chart -->
+            <div class="col-lg-7">
+                <div class="stat-chart-container stat-chart-container-tall" x-show="showProbChart" x-cloak>
+                    <h6 class="small fw-bold mb-2" x-text="probDist === 'normal' ? 'Probability Density Function (PDF)' : 'Probability Mass Function (PMF)'"></h6>
+                    <canvas id="probChartCanvas"></canvas>
+                </div>
+                <template x-if="!showProbChart">
+                    <div class="text-center text-muted py-5">
+                        <div style="font-size: 3rem; opacity: 0.2;">🎲</div>
+                        <p class="small mb-0 mt-2">Set parameters and click <strong>Compute Distribution</strong> to see the chart</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden forms for anti-forgery tokens -->
+<form id="stats-form-compute" method="post" asp-page-handler="Compute" style="display:none">
+    <input type="hidden" name="data" />
+</form>
+<form id="stats-form-viz" method="post" asp-page-handler="Visualize" style="display:none">
+    <input type="hidden" name="data" />
+</form>
+<form id="stats-form-csv" method="post" asp-page-handler="UploadCsv" enctype="multipart/form-data" style="display:none"></form>
+<form id="stats-form-reg" method="post" asp-page-handler="Regression" style="display:none">
+    <input type="hidden" name="dataX" />
+    <input type="hidden" name="dataY" />
+    <input type="hidden" name="degree" />
+</form>
+<form id="stats-form-save" method="post" asp-page-handler="SaveDataSet" style="display:none">
+    <input type="hidden" name="name" />
+    <input type="hidden" name="description" />
+    <input type="hidden" name="headersJson" />
+    <input type="hidden" name="columnsJson" />
+</form>
+<form id="stats-form-prob" method="post" asp-page-handler="Probability" style="display:none">
+    <input type="hidden" name="distribution" />
+    <input type="hidden" name="mean" />
+    <input type="hidden" name="stdDev" />
+    <input type="hidden" name="n" />
+    <input type="hidden" name="p" />
+    <input type="hidden" name="lambda" />
+    <input type="hidden" name="x" />
+    <input type="hidden" name="k" />
+</form>
+
+@if (Model.PreloadJson is not null)
+{
+    <script id="stats-preload" type="application/json">@Html.Raw(Model.PreloadJson)</script>
+}
+
+@section Scripts {
+<script>
+    function statsCalc() {
+        let histChart = null, boxChart = null, scatterChart = null, probChart = null;
+
+        return {
+            // Data
+            rawData: '',
+            statsHtml: '',
+            chartError: '',
+            showHistogram: false,
+            showBoxPlot: false,
+            showScatter: false,
+
+            // CSV
+            csvColumns: [],
+            csvData: {},
+            csvRowCount: 0,
+
+            // Regression
+            regX: '',
+            regY: '',
+            regDegree: 1,
+            regResult: null,
+
+            // CSV → Regression column selectors
+            csvRegXCol: '',
+            csvRegYCol: '',
+
+            // Save / Load state
+            showSaveModal: false,
+            saveName: '',
+            saveDescription: '',
+            saveStatus: '',
+            showLoadPicker: false,
+            savedDataSets: [],
+
+            // Probability distributions
+            probDist: 'normal',
+            probMean: 0,
+            probStdDev: 1,
+            probN: 10,
+            probP: 0.5,
+            probLambda: 5,
+            probX: '',
+            probK: '',
+            probResult: null,
+            showProbChart: false,
+            probDefaultsApplied: false,
+
+            // ─── Preload from server (when loading a saved data set) ───
+            initPreload() {
+                const el = document.getElementById('stats-preload');
+                if (!el) return;
+                try {
+                    const json = JSON.parse(el.textContent);
+                    if (json.headers && json.columns) {
+                        this.csvData = json.columns;
+                        this.csvColumns = json.headers;
+                        this.csvRowCount = json.rowCount || 0;
+                        this.csvRegXCol = json.headers[0] || '';
+                        this.csvRegYCol = json.headers.length > 1 ? json.headers[1] : (json.headers[0] || '');
+                        if (json.name) this.saveName = json.name;
+                    }
+                } catch (e) { /* ignore parse errors */ }
+            },
+
+            // ─── Apply probability defaults from dataset stats ───
+            applyProbDefaults(mean, stdDev, count) {
+                this.probMean = parseFloat(mean.toFixed(4));
+                this.probStdDev = parseFloat(Math.max(stdDev, 0.001).toFixed(4));
+                this.probLambda = parseFloat(Math.max(mean, 0.01).toFixed(4));
+                this.probN = count;
+                this.probDefaultsApplied = true;
+            },
+
+            // ─── Clear all data ───
+            clearAll() {
+                this.rawData = '';
+                this.statsHtml = '';
+                this.chartError = '';
+                this.showHistogram = false;
+                this.showBoxPlot = false;
+                if (histChart) { histChart.destroy(); histChart = null; }
+                if (boxChart) { boxChart.destroy(); boxChart = null; }
+            },
+
+            // ─── Compute descriptive stats ───
+            async compute() {
+                this.chartError = '';
+                this.statsHtml = '';
+                if (!this.rawData.trim()) { this.chartError = 'Enter some data first.'; return; }
+
+                const form = document.getElementById('stats-form-compute');
+                const fd = new FormData(form);
+                fd.set('data', this.rawData);
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    this.statsHtml = await resp.text();
+
+                    // Auto-populate probability defaults from the dataset
+                    const nums = this.rawData.split(/[,\s\n]+/).filter(s => s.trim() !== '').map(Number).filter(n => !isNaN(n));
+                    if (nums.length > 0) {
+                        const m = nums.reduce((a, b) => a + b, 0) / nums.length;
+                        const sd = Math.sqrt(nums.reduce((a, b) => a + (b - m) ** 2, 0) / nums.length);
+                        this.applyProbDefaults(m, sd, nums.length);
+                    }
+                } catch (e) {
+                    this.chartError = 'Compute failed: ' + e.message;
+                }
+            },
+
+            // ─── Visualize (histogram + box plot) ───
+            async visualize() {
+                this.chartError = '';
+                if (!this.rawData.trim()) { this.chartError = 'Enter some data first.'; return; }
+
+                const form = document.getElementById('stats-form-viz');
+                const fd = new FormData(form);
+                fd.set('data', this.rawData);
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; return; }
+
+                    this.renderHistogram(json);
+                    this.renderBoxPlot(json);
+                    this.applyProbDefaults(json.stats.mean, json.stats.stdDev, json.values.length);
+                } catch (e) {
+                    this.chartError = 'Chart failed: ' + e.message;
+                }
+            },
+
+            // ─── CSV upload ───
+            async uploadCsv() {
+                this.chartError = '';
+                this.csvColumns = [];
+                this.csvData = {};
+                this.csvRowCount = 0;
+
+                const fileInput = this.$refs.csvInput;
+                if (!fileInput.files.length) return;
+
+                const form = document.getElementById('stats-form-csv');
+                const fd = new FormData(form);
+                fd.append('csvFile', fileInput.files[0]);
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; return; }
+
+                    this.csvData = json.columns;
+                    this.csvColumns = json.headers;
+                    this.csvRowCount = json.rowCount;
+                    this.csvRegXCol = json.headers[0] || '';
+                    this.csvRegYCol = json.headers.length > 1 ? json.headers[1] : (json.headers[0] || '');
+                } catch (e) {
+                    this.chartError = 'Upload failed: ' + e.message;
+                }
+            },
+
+            // ─── Use CSV column for descriptive analysis ───
+            useCsvColumnForAnalysis(col) {
+                if (!this.csvData[col]) return;
+                const numericValues = this.csvData[col].filter(v => !isNaN(parseFloat(v)) && v.trim() !== '');
+                if (numericValues.length === 0) {
+                    this.chartError = 'Column "' + col + '" contains no numeric values.';
+                    return;
+                }
+                this.rawData = numericValues.join(', ');
+                this.$nextTick(() => {
+                    this.compute();
+                    this.visualize();
+                });
+            },
+
+            // ─── Use CSV column as regression X or Y ───
+            useCsvColumnForReg(col, axis) {
+                if (!this.csvData[col]) return;
+                const numericValues = this.csvData[col].filter(v => !isNaN(parseFloat(v)) && v.trim() !== '');
+                if (numericValues.length === 0) {
+                    this.chartError = 'Column "' + col + '" contains no numeric values.';
+                    return;
+                }
+                if (axis === 'x') {
+                    this.regX = numericValues.join(', ');
+                } else {
+                    this.regY = numericValues.join(', ');
+                }
+            },
+
+            // ─── Quick-fill regression from dropdown selectors ───
+            fillRegFromCsv(axis) {
+                if (axis === 'x' && this.csvRegXCol) {
+                    this.useCsvColumnForReg(this.csvRegXCol, 'x');
+                } else if (axis === 'y' && this.csvRegYCol) {
+                    this.useCsvColumnForReg(this.csvRegYCol, 'y');
+                }
+            },
+
+            // ─── Regression ───
+            async runRegression() {
+                this.chartError = '';
+                this.regResult = null;
+                if (!this.regX.trim() || !this.regY.trim()) { this.chartError = 'Enter X and Y data.'; return; }
+
+                const form = document.getElementById('stats-form-reg');
+                const fd = new FormData(form);
+                fd.set('dataX', this.regX);
+                fd.set('dataY', this.regY);
+                fd.set('degree', this.regDegree);
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; return; }
+
+                    this.regResult = json;
+                    this.renderScatter(json);
+                } catch (e) {
+                    this.chartError = 'Regression failed: ' + e.message;
+                }
+            },
+
+            // ─── Save data set ───
+            async saveDataSet() {
+                this.saveStatus = '';
+                if (!this.saveName.trim()) { this.saveStatus = 'Name is required.'; return; }
+                if (this.csvColumns.length === 0) { this.saveStatus = 'No data to save.'; return; }
+
+                const form = document.getElementById('stats-form-save');
+                const fd = new FormData(form);
+                fd.set('name', this.saveName);
+                fd.set('description', this.saveDescription);
+                fd.set('headersJson', JSON.stringify(this.csvColumns));
+                fd.set('columnsJson', JSON.stringify(this.csvData));
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.saveStatus = json.error; return; }
+                    this.saveStatus = '✓ Saved!';
+                    setTimeout(() => { this.showSaveModal = false; this.saveStatus = ''; }, 1200);
+                } catch (e) {
+                    this.saveStatus = 'Save failed: ' + e.message;
+                }
+            },
+
+            // ─── Load saved data set list ───
+            async loadDataSetList() {
+                this.showLoadPicker = !this.showLoadPicker;
+                if (!this.showLoadPicker) return;
+                this.savedDataSets = [];
+                try {
+                    const resp = await fetch('?handler=ListDataSets');
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; this.showLoadPicker = false; return; }
+                    this.savedDataSets = json;
+                } catch (e) {
+                    this.chartError = 'Failed to load list: ' + e.message;
+                    this.showLoadPicker = false;
+                }
+            },
+
+            // ─── Export current CSV data as a file download ───
+            exportCurrentCsv() {
+                if (this.csvColumns.length === 0) return;
+                let csv = this.csvColumns.join(',') + '\n';
+                const rowCount = (this.csvData[this.csvColumns[0]] || []).length;
+                for (let r = 0; r < rowCount; r++) {
+                    csv += this.csvColumns.map(col => {
+                        const val = (this.csvData[col] || [])[r] || '';
+                        return val.includes(',') || val.includes('"') || val.includes('\n')
+                            ? '"' + val.replace(/"/g, '""') + '"' : val;
+                    }).join(',') + '\n';
+                }
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'statistics-export.csv';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            },
+
+            // ─── Probability distributions ───
+            async computeProbability() {
+                this.chartError = '';
+                this.probResult = null;
+
+                const form = document.getElementById('stats-form-prob');
+                const fd = new FormData(form);
+                fd.set('distribution', this.probDist);
+
+                if (this.probDist === 'normal') {
+                    fd.set('mean', this.probMean);
+                    fd.set('stdDev', this.probStdDev);
+                    if (this.probX !== '' && this.probX !== null) fd.set('x', this.probX);
+                } else if (this.probDist === 'binomial') {
+                    fd.set('n', this.probN);
+                    fd.set('p', this.probP);
+                    if (this.probK !== '' && this.probK !== null) fd.set('k', this.probK);
+                } else if (this.probDist === 'poisson') {
+                    fd.set('lambda', this.probLambda);
+                    if (this.probK !== '' && this.probK !== null) fd.set('k', this.probK);
+                }
+
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; return; }
+
+                    this.probResult = json;
+                    this.renderProbChart(json);
+                } catch (e) {
+                    this.chartError = 'Distribution computation failed: ' + e.message;
+                }
+            },
+
+            renderProbChart(json) {
+                this.showProbChart = true;
+                this.$nextTick(() => {
+                    const ctx = document.getElementById('probChartCanvas').getContext('2d');
+                    if (probChart) probChart.destroy();
+
+                    if (json.type === 'normal') {
+                        const curveData = json.curve.map(pt => ({ x: pt.x, y: pt.y }));
+                        const datasets = [{
+                            label: `Normal(μ=${json.mean}, σ=${json.stdDev})`,
+                            data: curveData,
+                            showLine: true,
+                            borderColor: '#4f6ef7',
+                            backgroundColor: 'rgba(79, 110, 247, 0.15)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            tension: 0.4
+                        }];
+                        // Highlight queried x with a vertical line via annotation
+                        if (json.queriedX !== null && json.queriedX !== undefined) {
+                            // Add shaded CDF region
+                            const shadedData = curveData.filter(pt => pt.x <= json.queriedX);
+                            datasets.push({
+                                label: `P(X ≤ ${json.queriedX}) = ${json.cdfAtX?.toFixed(4)}`,
+                                data: shadedData,
+                                showLine: true,
+                                borderColor: 'transparent',
+                                backgroundColor: 'rgba(79, 110, 247, 0.35)',
+                                borderWidth: 0,
+                                pointRadius: 0,
+                                fill: true,
+                                tension: 0.4
+                            });
+                        }
+                        probChart = new Chart(ctx, {
+                            type: 'scatter',
+                            data: { datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { position: 'bottom', labels: { font: { size: 11 } } }
+                                },
+                                scales: {
+                                    x: { title: { display: true, text: 'x' } },
+                                    y: { title: { display: true, text: 'f(x)' }, beginAtZero: true }
+                                }
+                            }
+                        });
+                    } else {
+                        // Discrete (Binomial / Poisson) — bar chart
+                        const labels = json.points.map(pt => pt.x.toString());
+                        const data = json.points.map(pt => pt.y);
+                        const bgColors = data.map((_, i) => {
+                            if (json.queriedK !== null && json.queriedK !== undefined && json.points[i].x === json.queriedK) {
+                                return '#e74c3c';
+                            }
+                            return 'rgba(79, 110, 247, 0.6)';
+                        });
+                        const distLabel = json.type === 'binomial'
+                            ? `Binomial(n=${json.n}, p=${json.p})`
+                            : `Poisson(λ=${json.lambda})`;
+
+                        probChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels,
+                                datasets: [{
+                                    label: distLabel,
+                                    data,
+                                    backgroundColor: bgColors,
+                                    borderColor: '#4f6ef7',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { position: 'bottom', labels: { font: { size: 11 } } }
+                                },
+                                scales: {
+                                    x: { title: { display: true, text: 'k' } },
+                                    y: { title: { display: true, text: 'P(X = k)' }, beginAtZero: true }
+                                }
+                            }
+                        });
+                    }
+                });
+            },
+
+            // ─── Chart renderers ───
+            renderHistogram(json) {
+                this.showHistogram = true;
+                this.$nextTick(() => {
+                    const ctx = document.getElementById('histogramCanvas').getContext('2d');
+                    if (histChart) histChart.destroy();
+                    histChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: json.histogram.map(b => b.label),
+                            datasets: [{
+                                label: 'Frequency',
+                                data: json.histogram.map(b => b.count),
+                                backgroundColor: 'rgba(79, 110, 247, 0.6)',
+                                borderColor: '#4f6ef7',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { precision: 0 } }
+                            }
+                        }
+                    });
+                });
+            },
+
+            renderBoxPlot(json) {
+                this.showBoxPlot = true;
+                this.$nextTick(() => {
+                    const ctx = document.getElementById('boxPlotCanvas').getContext('2d');
+                    if (boxChart) boxChart.destroy();
+
+                    const s = json.stats;
+                    const pad = (s.max - s.min) * 0.05 || 0.5;
+                    boxChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: [''],
+                            datasets: [
+                                { label: '', data: [s.min], backgroundColor: 'transparent', borderColor: 'transparent', borderWidth: 0 },
+                                { label: 'Min → Q1', data: [s.q1 - s.min], backgroundColor: 'rgba(79,110,247,0.15)', borderColor: '#4f6ef7', borderWidth: 1 },
+                                { label: 'Q1 → Median', data: [s.median - s.q1], backgroundColor: 'rgba(79,110,247,0.5)', borderColor: '#4f6ef7', borderWidth: 1 },
+                                { label: 'Median → Q3', data: [s.q3 - s.median], backgroundColor: 'rgba(79,110,247,0.5)', borderColor: '#4f6ef7', borderWidth: 1 },
+                                { label: 'Q3 → Max', data: [s.max - s.q3], backgroundColor: 'rgba(79,110,247,0.15)', borderColor: '#4f6ef7', borderWidth: 1 },
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true, position: 'bottom',
+                                    labels: { boxWidth: 12, font: { size: 11 }, filter: (item) => item.text !== '' }
+                                },
+                                tooltip: {
+                                    filter: (item) => item.dataset.label !== '',
+                                    callbacks: {
+                                        afterBody: () => [
+                                            'Min: ' + s.min.toFixed(4),
+                                            'Q1: ' + s.q1.toFixed(4),
+                                            'Median: ' + s.median.toFixed(4),
+                                            'Q3: ' + s.q3.toFixed(4),
+                                            'Max: ' + s.max.toFixed(4)
+                                        ]
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: { stacked: true, min: s.min - pad, title: { display: true, text: 'Value' } },
+                                y: { stacked: true }
+                            }
+                        }
+                    });
+                });
+            },
+
+            renderScatter(json) {
+                this.showScatter = true;
+                this.$nextTick(() => {
+                    const ctx = document.getElementById('scatterCanvas').getContext('2d');
+                    if (scatterChart) scatterChart.destroy();
+                    scatterChart = new Chart(ctx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [
+                                {
+                                    label: 'Data',
+                                    data: json.scatter,
+                                    backgroundColor: '#4f6ef7',
+                                    pointRadius: 4
+                                },
+                                {
+                                    label: json.equation + ' (R\u00B2=' + json.rSquared.toFixed(4) + ')',
+                                    data: json.trendLine,
+                                    type: 'scatter',
+                                    showLine: true,
+                                    borderColor: '#e74c3c',
+                                    backgroundColor: 'transparent',
+                                    borderWidth: 2,
+                                    pointRadius: 0,
+                                    tension: 0.3
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { font: { size: 11 } } }
+                            }
+                        }
+                    });
+                });
+            }
+        };
+    }
+</script>
+}
