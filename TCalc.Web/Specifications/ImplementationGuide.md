@@ -213,7 +213,7 @@
 | 9.8 | Integration tests for CSV upload handler (valid file, invalid file, oversized file) | [ ] |
 | 9.9 | Integration tests for Identity flows (register, login, access protected page) | [ ] |
 | 9.10 | Integration tests for Razor Page handlers using `WebApplicationFactory<Program>` | [ ] |
-| 9.11 | Add a CI build script or GitHub Actions workflow that restores, builds, and runs tests | [ ] |
+| 9.11 | ~~Add a CI build script or GitHub Actions workflow that restores, builds, and runs tests~~ | [—] |
 
 ---
 
