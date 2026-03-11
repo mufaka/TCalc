@@ -294,6 +294,45 @@ a:hover {
 
 /* ---------- Bootstrap card override (dark-mode safe) ---------- */
 
+/* ---------- Password rules checklist ---------- */
+
+.pwd-rules {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: .85rem;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.pwd-rules li,
+.pwd-rules > span {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  transition: color .15s ease;
+}
+
+.pwd-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pwd-met {
+  color: #22c55e;
+}
+
+.pwd-unmet {
+  color: var(--tc-text-muted);
+}
+
+/* ---------- Bootstrap card override (dark-mode safe) ---------- */
+
 .card {
   background-color: var(--tc-card-bg);
   border-color: var(--tc-card-border);
@@ -306,6 +345,85 @@ a:hover {
   --bs-table-color: var(--tc-text);
   --bs-table-bg: transparent;
   --bs-table-border-color: var(--tc-border);
+}
+
+/* ---------- Bootstrap form-floating / form-check (dark-mode safe) --- */
+
+[data-theme="dark"] .form-floating > label {
+  color: var(--tc-text-muted);
+}
+
+[data-theme="dark"] .form-floating > .form-control:focus ~ label,
+[data-theme="dark"] .form-floating > .form-control:not(:placeholder-shown) ~ label,
+[data-theme="dark"] .form-floating > .form-select ~ label {
+  color: var(--tc-text-muted);
+}
+
+[data-theme="dark"] .form-check-input {
+  background-color: var(--tc-bg-elevated);
+  border-color: var(--tc-border);
+}
+[data-theme="dark"] .form-check-input:checked {
+  background-color: var(--tc-primary);
+  border-color: var(--tc-primary);
+}
+[data-theme="dark"] .form-check-label {
+  color: var(--tc-text);
+}
+
+/* ---------- Bootstrap list-group (dark-mode safe) ---------- */
+
+[data-theme="dark"] .list-group-item {
+  background-color: var(--tc-bg-elevated);
+  color: var(--tc-text);
+  border-color: var(--tc-border);
+}
+[data-theme="dark"] .list-group-item.active {
+  background-color: var(--tc-primary);
+  border-color: var(--tc-primary);
+  color: var(--tc-primary-fg);
+}
+[data-theme="dark"] .list-group-item-action:hover,
+[data-theme="dark"] .list-group-item-action:focus {
+  background-color: var(--tc-card-hover-bg);
+  color: var(--tc-text);
+}
+
+/* ---------- Bootstrap nav-pills (dark-mode safe) ---------- */
+
+[data-theme="dark"] .nav-pills .nav-link {
+  color: var(--tc-text-muted);
+}
+[data-theme="dark"] .nav-pills .nav-link.active {
+  background-color: var(--tc-primary);
+  color: var(--tc-primary-fg);
+}
+[data-theme="dark"] .nav-pills .nav-link:not(.active):hover {
+  color: var(--tc-text);
+  background-color: var(--tc-card-hover-bg);
+}
+
+/* ---------- Misc Bootstrap overrides (dark-mode safe) ---------- */
+
+[data-theme="dark"] hr {
+  color: var(--tc-border);
+  opacity: 1;
+}
+
+[data-theme="dark"] .input-group-text {
+  background-color: var(--tc-bg-secondary);
+  color: var(--tc-text);
+  border-color: var(--tc-border);
+}
+
+[data-theme="dark"] .btn-outline-secondary {
+  color: var(--tc-text-muted);
+  border-color: var(--tc-border);
+}
+[data-theme="dark"] .btn-outline-secondary:hover {
+  background-color: var(--tc-card-hover-bg);
+  color: var(--tc-text);
+  border-color: var(--tc-text-muted);
 }
 
 /* ---------- Navbar toggler for dark mode ---------- */

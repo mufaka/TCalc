@@ -1,0 +1,112 @@
+﻿@page
+@model TCalc.Web.Areas.Identity.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Register";
+    var r = Model.PasswordRules;
+}
+
+<div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+<form method="post" x-data="{
+    pw: '',
+    confirm: '',
+    rules: {
+        minLength:    @r.RequiredLength,
+        upper:        @r.RequireUppercase.ToString().ToLowerInvariant(),
+        lower:        @r.RequireLowercase.ToString().ToLowerInvariant(),
+        digit:        @r.RequireDigit.ToString().ToLowerInvariant(),
+        nonAlpha:     @r.RequireNonAlphanumeric.ToString().ToLowerInvariant(),
+        uniqueChars:  @r.RequiredUniqueChars
+    },
+    get hasMinLength()  { return this.pw.length >= this.rules.minLength; },
+    get hasUpper()      { return !this.rules.upper  || /[A-Z]/.test(this.pw); },
+    get hasLower()      { return !this.rules.lower  || /[a-z]/.test(this.pw); },
+    get hasDigit()      { return !this.rules.digit  || /[0-9]/.test(this.pw); },
+    get hasNonAlpha()   { return !this.rules.nonAlpha || /[^a-zA-Z0-9]/.test(this.pw); },
+    get hasUniqueChars(){ return new Set(this.pw).size >= this.rules.uniqueChars; },
+    get allMet()        { return this.hasMinLength && this.hasUpper && this.hasLower && this.hasDigit && this.hasNonAlpha && this.hasUniqueChars; },
+    get confirmMatch()  { return this.confirm.length > 0 && this.pw === this.confirm; }
+}">
+    <div class="form-floating mb-3">
+        <input asp-for="Input.Email" class="form-control" autocomplete="username" aria-required="true"
+               placeholder="name@example.com" />
+        <label asp-for="Input.Email">Email</label>
+        <span asp-validation-for="Input.Email" class="text-danger"></span>
+    </div>
+
+    <div class="form-floating mb-3">
+        <input asp-for="Input.Password" class="form-control" autocomplete="new-password"
+               aria-required="true" placeholder="Password" x-model="pw" />
+        <label asp-for="Input.Password">Password</label>
+        <span asp-validation-for="Input.Password" class="text-danger"></span>
+    </div>
+
+    <!-- Password rules checklist -->
+    <ul class="pwd-rules mb-3" x-show="pw.length > 0" x-transition.opacity>
+        <li :class="hasMinLength ? 'pwd-met' : 'pwd-unmet'">
+            <span class="pwd-icon" x-text="hasMinLength ? '✓' : '✗'"></span>
+            At least @r.RequiredLength characters
+        </li>
+        @if (r.RequireUppercase)
+        {
+            <li :class="hasUpper ? 'pwd-met' : 'pwd-unmet'">
+                <span class="pwd-icon" x-text="hasUpper ? '✓' : '✗'"></span>
+                An uppercase letter
+            </li>
+        }
+        @if (r.RequireLowercase)
+        {
+            <li :class="hasLower ? 'pwd-met' : 'pwd-unmet'">
+                <span class="pwd-icon" x-text="hasLower ? '✓' : '✗'"></span>
+                A lowercase letter
+            </li>
+        }
+        @if (r.RequireDigit)
+        {
+            <li :class="hasDigit ? 'pwd-met' : 'pwd-unmet'">
+                <span class="pwd-icon" x-text="hasDigit ? '✓' : '✗'"></span>
+                A digit
+            </li>
+        }
+        @if (r.RequireNonAlphanumeric)
+        {
+            <li :class="hasNonAlpha ? 'pwd-met' : 'pwd-unmet'">
+                <span class="pwd-icon" x-text="hasNonAlpha ? '✓' : '✗'"></span>
+                A special character
+            </li>
+        }
+        @if (r.RequiredUniqueChars > 1)
+        {
+            <li :class="hasUniqueChars ? 'pwd-met' : 'pwd-unmet'">
+                <span class="pwd-icon" x-text="hasUniqueChars ? '✓' : '✗'"></span>
+                At least @r.RequiredUniqueChars unique characters
+            </li>
+        }
+    </ul>
+
+    <div class="form-floating mb-3">
+        <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password"
+               aria-required="true" placeholder="Confirm password" x-model="confirm" />
+        <label asp-for="Input.ConfirmPassword">Confirm password</label>
+        <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+    </div>
+
+    <!-- Confirm password match indicator -->
+    <div class="pwd-rules mb-3" x-show="confirm.length > 0" x-transition.opacity>
+        <span :class="confirmMatch ? 'pwd-met' : 'pwd-unmet'" style="font-size:.85rem;">
+            <span class="pwd-icon" x-text="confirmMatch ? '✓' : '✗'"></span>
+            Passwords match
+        </span>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100 py-2 mb-3">Register</button>
+
+    <div class="text-center">
+        <small class="text-muted">
+            Already have an account?
+            <a asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">Log in</a>
+        </small>
+    </div>
+</form>
+
+<input type="hidden" asp-for="ReturnUrl" form="" name="returnUrl" value="@Model.ReturnUrl" />
