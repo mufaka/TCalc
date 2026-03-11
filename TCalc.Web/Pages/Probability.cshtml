@@ -1,0 +1,874 @@
+﻿@page
+@model TCalc.Web.Pages.ProbabilityModel
+@{
+    ViewData["Title"] = "Probability";
+}
+
+<div x-data="probabilityApp()" x-cloak>
+
+    <!-- ─── Header ─── -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+        <div>
+            <h1 class="calc-title mb-0">🎲 Probability</h1>
+            <p class="text-muted mb-0" style="font-size:.9rem;">
+                Interactive probability concepts, rules, and calculations
+            </p>
+        </div>
+    </div>
+
+    <!-- ─── Section Tabs ─── -->
+    <div class="prob-type-selector mb-4">
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'basic' && 'active'"
+                @@click="tab = 'basic'">Basic Concepts</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'conditional' && 'active'"
+                @@click="tab = 'conditional'">Conditional</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'addition' && 'active'"
+                @@click="tab = 'addition'">Addition Rule</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'multiplication' && 'active'"
+                @@click="tab = 'multiplication'">Multiplication Rule</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'experimental' && 'active'"
+                @@click="tab = 'experimental'">Experimental</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 1 — Basic Concepts: P(A) = favourable / total
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'basic'" x-transition>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Theoretical Probability</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        P(A) = <em>favourable outcomes</em> ÷ <em>total outcomes</em>
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Favourable outcomes</label>
+                        <input type="number" class="form-control" min="0"
+                               x-model.number="basic.favourable"
+                               @@input="computeBasic()" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Total outcomes (sample space)</label>
+                        <input type="number" class="form-control" min="1"
+                               x-model.number="basic.total"
+                               @@input="computeBasic()" />
+                    </div>
+
+                    <template x-if="basic.error">
+                        <div class="text-danger mb-2" style="font-size:.85rem;" x-text="basic.error"></div>
+                    </template>
+
+                    <template x-if="basic.probability !== null && !basic.error">
+                        <div class="prob-result-card">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A)</span>
+                                <span class="prob-stat-value" x-text="fmt(basic.probability)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A) %</span>
+                                <span class="prob-stat-value" x-text="fmt(basic.probability * 100) + '%'"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(not A)</span>
+                                <span class="prob-stat-value" x-text="fmt(1 - basic.probability)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">Odds (A : not A)</span>
+                                <span class="prob-stat-value"
+                                      x-text="basic.favourable + ' : ' + (basic.total - basic.favourable)"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Probability Line visualisation -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Probability Line</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Every probability falls between 0 (impossible) and 1 (certain). The sum of all outcomes = 1.
+                    </p>
+                    <svg viewBox="0 0 500 100" class="w-100" style="max-height:120px;">
+                        <!-- Track -->
+                        <line x1="40" y1="50" x2="460" y2="50"
+                              stroke="var(--tc-border)" stroke-width="3" stroke-linecap="round" />
+                        <!-- Ticks -->
+                        <template x-for="i in 11">
+                            <g>
+                                <line :x1="40 + (i-1)*42" y1="40" :x2="40 + (i-1)*42" y2="60"
+                                      stroke="var(--tc-text-muted)" stroke-width="1.5" />
+                                <text :x="40 + (i-1)*42" y="78" text-anchor="middle"
+                                      fill="var(--tc-text-muted)" font-size="11"
+                                      x-text="((i-1)/10).toFixed(1)"></text>
+                            </g>
+                        </template>
+                        <!-- Labels -->
+                        <text x="40" y="28" text-anchor="middle" fill="var(--tc-text-muted)" font-size="10">Impossible</text>
+                        <text x="250" y="28" text-anchor="middle" fill="var(--tc-text-muted)" font-size="10">Even chance</text>
+                        <text x="460" y="28" text-anchor="middle" fill="var(--tc-text-muted)" font-size="10">Certain</text>
+                        <!-- Marker -->
+                        <template x-if="basic.probability !== null && !basic.error">
+                            <g>
+                                <circle :cx="40 + basic.probability * 420" cy="50" r="8"
+                                        fill="var(--tc-primary)" opacity="0.9" />
+                                <text :x="40 + basic.probability * 420" y="96" text-anchor="middle"
+                                      fill="var(--tc-primary)" font-size="12" font-weight="700"
+                                      x-text="'P(A) = ' + fmt(basic.probability)"></text>
+                            </g>
+                        </template>
+                    </svg>
+
+                    <!-- Sample space grid -->
+                    <template x-if="basic.total > 0 && basic.total <= 120 && !basic.error">
+                        <div>
+                            <p class="text-muted mt-3 mb-2" style="font-size:.82rem;">
+                                Sample space (<span x-text="basic.total"></span> outcomes,
+                                <span x-text="basic.favourable" class="fw-bold" style="color:var(--tc-primary)"></span> favourable):
+                            </p>
+                            <div class="d-flex flex-wrap gap-1">
+                                <template x-for="i in basic.total">
+                                    <div class="prob-sample-cell"
+                                         :class="i <= basic.favourable ? 'prob-sample-hit' : ''">
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 2 — Conditional Probability: P(A|B) = P(A ∩ B) / P(B)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'conditional'" x-transition>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Conditional Probability</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        P(A | B) = P(A ∩ B) ÷ P(B) — the probability of A given that B has occurred.
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label">P(A ∩ B) — both A and B</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="cond.pAB"
+                               @@input="computeConditional()" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">P(B)</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="cond.pB"
+                               @@input="computeConditional()" />
+                    </div>
+
+                    <template x-if="cond.error">
+                        <div class="text-danger mb-2" style="font-size:.85rem;" x-text="cond.error"></div>
+                    </template>
+
+                    <template x-if="cond.result !== null && !cond.error">
+                        <div class="prob-result-card">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A | B)</span>
+                                <span class="prob-stat-value" x-text="fmt(cond.result)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A | B) %</span>
+                                <span class="prob-stat-value" x-text="fmt(cond.result * 100) + '%'"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">Interpretation</span>
+                                <span class="prob-stat-value" style="font-size:.78rem;max-width:60%;text-align:right;"
+                                      x-text="'Given B occurred, there is a ' + fmt(cond.result * 100) + '% chance A also occurs.'"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Reverse conditional via Bayes -->
+                    <div class="mt-3 pt-3" style="border-top:1px solid var(--tc-border);">
+                        <p class="text-muted mb-2" style="font-size:.82rem;">
+                            <strong>Bayes' Theorem</strong>: supply P(A) to also compute P(B | A).
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label">P(A) <span class="text-muted">(optional)</span></label>
+                            <input type="number" class="form-control" min="0" max="1" step="0.01"
+                                   x-model.number="cond.pA"
+                                   @@input="computeConditional()" />
+                        </div>
+                        <template x-if="cond.pBgivenA !== null && !cond.error">
+                            <div class="prob-result-card">
+                                <div class="d-flex justify-content-between">
+                                    <span class="prob-stat-label">P(B | A)</span>
+                                    <span class="prob-stat-value" x-text="fmt(cond.pBgivenA)"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Venn diagram -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Venn Diagram</h2>
+                    <svg viewBox="0 0 420 280" class="w-100" style="max-height:320px;">
+                        <!-- Universe -->
+                        <rect x="10" y="10" width="400" height="260" rx="12"
+                              fill="none" stroke="var(--tc-border)" stroke-width="1.5" />
+                        <text x="20" y="30" fill="var(--tc-text-muted)" font-size="11">S (Sample Space)</text>
+
+                        <!-- Circle B -->
+                        <circle cx="250" cy="140" r="95"
+                                fill="var(--tc-primary)" opacity="0.12"
+                                stroke="var(--tc-primary)" stroke-width="2" />
+                        <text x="310" y="90" fill="var(--tc-primary)" font-size="13" font-weight="700">B</text>
+
+                        <!-- Circle A -->
+                        <circle cx="180" cy="140" r="95"
+                                fill="var(--tc-gradient-to)" opacity="0.12"
+                                stroke="var(--tc-gradient-to)" stroke-width="2" />
+                        <text x="115" y="90" fill="var(--tc-gradient-to)" font-size="13" font-weight="700">A</text>
+
+                        <!-- Intersection highlight -->
+                        <clipPath id="clipB">
+                            <circle cx="250" cy="140" r="95" />
+                        </clipPath>
+                        <circle cx="180" cy="140" r="95"
+                                clip-path="url(#clipB)"
+                                fill="var(--tc-primary)" opacity="0.3" />
+
+                        <!-- Intersection label -->
+                        <text x="215" y="136" text-anchor="middle"
+                              fill="var(--tc-text)" font-size="12" font-weight="600">A ∩ B</text>
+                        <text x="215" y="154" text-anchor="middle"
+                              fill="var(--tc-text)" font-size="11"
+                              x-text="cond.pAB != null ? fmt(cond.pAB) : '—'"></text>
+
+                        <!-- P(B) label -->
+                        <text x="300" y="145" text-anchor="middle"
+                              fill="var(--tc-primary)" font-size="11"
+                              x-text="cond.pB != null ? 'P(B) = ' + fmt(cond.pB) : ''"></text>
+
+                        <!-- P(A) label -->
+                        <text x="130" y="145" text-anchor="middle"
+                              fill="var(--tc-gradient-to)" font-size="11"
+                              x-text="cond.pA != null ? 'P(A) = ' + fmt(cond.pA) : ''"></text>
+
+                        <!-- Result -->
+                        <template x-if="cond.result !== null && !cond.error">
+                            <text x="210" y="260" text-anchor="middle"
+                                  fill="var(--tc-text)" font-size="13" font-weight="700"
+                                  x-text="'P(A | B) = ' + fmt(cond.result)"></text>
+                        </template>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 3 — Addition Rule: P(A ∪ B) = P(A) + P(B) − P(A ∩ B)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'addition'" x-transition>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Addition Rule (Or)</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        P(A ∪ B) = P(A) + P(B) − P(A ∩ B)
+                    </p>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="addMutex"
+                               x-model="add.mutuallyExclusive"
+                               @@change="if(add.mutuallyExclusive) add.pAB = 0; computeAddition();" />
+                        <label class="form-check-label" for="addMutex">
+                            Mutually exclusive (A ∩ B = 0)
+                        </label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">P(A)</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="add.pA" @@input="computeAddition()" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">P(B)</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="add.pB" @@input="computeAddition()" />
+                    </div>
+                    <div class="mb-3" x-show="!add.mutuallyExclusive">
+                        <label class="form-label">P(A ∩ B)</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="add.pAB" @@input="computeAddition()" />
+                    </div>
+
+                    <template x-if="add.error">
+                        <div class="text-danger mb-2" style="font-size:.85rem;" x-text="add.error"></div>
+                    </template>
+
+                    <template x-if="add.result !== null && !add.error">
+                        <div class="prob-result-card">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A ∪ B)</span>
+                                <span class="prob-stat-value" x-text="fmt(add.result)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A ∪ B) %</span>
+                                <span class="prob-stat-value" x-text="fmt(add.result * 100) + '%'"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(neither)</span>
+                                <span class="prob-stat-value" x-text="fmt(1 - add.result)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">Formula used</span>
+                                <span class="prob-stat-value" style="font-size:.78rem;"
+                                      x-text="add.mutuallyExclusive
+                                          ? fmt(add.pA) + ' + ' + fmt(add.pB) + ' = ' + fmt(add.result)
+                                          : fmt(add.pA) + ' + ' + fmt(add.pB) + ' − ' + fmt(add.pAB) + ' = ' + fmt(add.result)">
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Venn diagram — Addition -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Venn Diagram — A ∪ B</h2>
+                    <svg viewBox="0 0 420 280" class="w-100" style="max-height:320px;">
+                        <rect x="10" y="10" width="400" height="260" rx="12"
+                              fill="none" stroke="var(--tc-border)" stroke-width="1.5" />
+                        <text x="20" y="30" fill="var(--tc-text-muted)" font-size="11">S</text>
+
+                        <!-- Dynamically separate circles when mutually exclusive -->
+                        <circle :cx="add.mutuallyExclusive ? 155 : 180" cy="140" r="90"
+                                fill="var(--tc-gradient-to)" opacity="0.18"
+                                stroke="var(--tc-gradient-to)" stroke-width="2" />
+                        <text :x="add.mutuallyExclusive ? 110 : 120" y="90"
+                              fill="var(--tc-gradient-to)" font-size="13" font-weight="700">A</text>
+
+                        <circle :cx="add.mutuallyExclusive ? 275 : 250" cy="140" r="90"
+                                fill="var(--tc-primary)" opacity="0.18"
+                                stroke="var(--tc-primary)" stroke-width="2" />
+                        <text :x="add.mutuallyExclusive ? 320 : 310" y="90"
+                              fill="var(--tc-primary)" font-size="13" font-weight="700">B</text>
+
+                        <!-- Intersection shading (only when not mutually exclusive) -->
+                        <template x-if="!add.mutuallyExclusive">
+                            <g>
+                                <clipPath id="clipAddB">
+                                    <circle cx="250" cy="140" r="90" />
+                                </clipPath>
+                                <circle cx="180" cy="140" r="90"
+                                        clip-path="url(#clipAddB)"
+                                        fill="var(--tc-primary)" opacity="0.3" />
+                                <text x="215" y="140" text-anchor="middle"
+                                      fill="var(--tc-text)" font-size="11"
+                                      x-text="add.pAB != null ? 'A∩B=' + fmt(add.pAB) : ''"></text>
+                            </g>
+                        </template>
+
+                        <!-- P labels -->
+                        <text :x="add.mutuallyExclusive ? 155 : 145" y="150" text-anchor="middle"
+                              fill="var(--tc-gradient-to)" font-size="11"
+                              x-text="add.pA != null ? fmt(add.pA) : ''"></text>
+                        <text :x="add.mutuallyExclusive ? 275 : 285" y="150" text-anchor="middle"
+                              fill="var(--tc-primary)" font-size="11"
+                              x-text="add.pB != null ? fmt(add.pB) : ''"></text>
+
+                        <!-- Result -->
+                        <template x-if="add.result !== null && !add.error">
+                            <text x="210" y="260" text-anchor="middle"
+                                  fill="var(--tc-text)" font-size="13" font-weight="700"
+                                  x-text="'P(A ∪ B) = ' + fmt(add.result)"></text>
+                        </template>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 4 — Multiplication Rule: P(A ∩ B)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'multiplication'" x-transition>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Multiplication Rule (And)</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Independent: P(A ∩ B) = P(A) × P(B)<br />
+                        Dependent: P(A ∩ B) = P(A) × P(B | A)
+                    </p>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="mulIndep"
+                               x-model="mul.independent"
+                               @@change="computeMultiplication()" />
+                        <label class="form-check-label" for="mulIndep">
+                            Events are independent
+                        </label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">P(A)</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="mul.pA" @@input="computeMultiplication()" />
+                    </div>
+
+                    <template x-if="mul.independent">
+                        <div class="mb-3">
+                            <label class="form-label">P(B)</label>
+                            <input type="number" class="form-control" min="0" max="1" step="0.01"
+                                   x-model.number="mul.pB" @@input="computeMultiplication()" />
+                        </div>
+                    </template>
+                    <template x-if="!mul.independent">
+                        <div class="mb-3">
+                            <label class="form-label">P(B | A) — probability of B given A</label>
+                            <input type="number" class="form-control" min="0" max="1" step="0.01"
+                                   x-model.number="mul.pBgivenA" @@input="computeMultiplication()" />
+                        </div>
+                    </template>
+
+                    <template x-if="mul.error">
+                        <div class="text-danger mb-2" style="font-size:.85rem;" x-text="mul.error"></div>
+                    </template>
+
+                    <template x-if="mul.result !== null && !mul.error">
+                        <div class="prob-result-card">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A ∩ B)</span>
+                                <span class="prob-stat-value" x-text="fmt(mul.result)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">P(A ∩ B) %</span>
+                                <span class="prob-stat-value" x-text="fmt(mul.result * 100) + '%'"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">Formula used</span>
+                                <span class="prob-stat-value" style="font-size:.78rem;"
+                                      x-text="mul.independent
+                                          ? fmt(mul.pA) + ' × ' + fmt(mul.pB) + ' = ' + fmt(mul.result)
+                                          : fmt(mul.pA) + ' × ' + fmt(mul.pBgivenA) + ' = ' + fmt(mul.result)">
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Tree diagram -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Tree Diagram</h2>
+                    <svg viewBox="0 0 460 300" class="w-100" style="max-height:340px;">
+                        <!-- Root -->
+                        <circle cx="60" cy="150" r="6" fill="var(--tc-text-muted)" />
+                        <text x="30" y="155" fill="var(--tc-text-muted)" font-size="11">Start</text>
+
+                        <!-- Branch A -->
+                        <line x1="66" y1="150" x2="170" y2="70" stroke="var(--tc-gradient-to)" stroke-width="2" />
+                        <text x="100" y="95" fill="var(--tc-gradient-to)" font-size="11" font-weight="600"
+                              x-text="mul.pA != null ? 'P(A)=' + fmt(mul.pA) : 'P(A)'"></text>
+                        <circle cx="175" cy="68" r="5" fill="var(--tc-gradient-to)" />
+                        <text x="178" y="58" fill="var(--tc-gradient-to)" font-size="12" font-weight="700">A</text>
+
+                        <!-- Branch not-A -->
+                        <line x1="66" y1="150" x2="170" y2="230" stroke="var(--tc-text-muted)" stroke-width="1.5" stroke-dasharray="4" />
+                        <text x="92" y="210" fill="var(--tc-text-muted)" font-size="11"
+                              x-text="mul.pA != null ? 'P(A\u2032)=' + fmt(1-mul.pA) : 'P(A\u2032)'"></text>
+                        <circle cx="175" cy="232" r="4" fill="var(--tc-text-muted)" />
+                        <text x="178" y="245" fill="var(--tc-text-muted)" font-size="11">A′</text>
+
+                        <!-- From A → B -->
+                        <line x1="180" y1="68" x2="310" y2="35" stroke="var(--tc-primary)" stroke-width="2" />
+                        <text x="225" y="42" fill="var(--tc-primary)" font-size="10" font-weight="600"
+                              x-text="mul.independent
+                                  ? (mul.pB != null ? 'P(B)=' + fmt(mul.pB) : 'P(B)')
+                                  : (mul.pBgivenA != null ? 'P(B|A)=' + fmt(mul.pBgivenA) : 'P(B|A)')">
+                        </text>
+                        <circle cx="315" cy="33" r="5" fill="var(--tc-primary)" />
+                        <text x="322" y="28" fill="var(--tc-primary)" font-size="12" font-weight="700">A ∩ B</text>
+
+                        <!-- Result at leaf -->
+                        <template x-if="mul.result !== null && !mul.error">
+                            <text x="322" y="46" fill="var(--tc-text)" font-size="11" font-weight="600"
+                                  x-text="'= ' + fmt(mul.result)"></text>
+                        </template>
+
+                        <!-- From A → not-B -->
+                        <line x1="180" y1="68" x2="310" y2="100" stroke="var(--tc-text-muted)" stroke-width="1.5" stroke-dasharray="4" />
+                        <text x="232" y="97" fill="var(--tc-text-muted)" font-size="10"
+                              x-text="mul.independent
+                                  ? (mul.pB != null ? 'P(B\u2032)=' + fmt(1-mul.pB) : 'P(B\u2032)')
+                                  : (mul.pBgivenA != null ? 'P(B\u2032|A)=' + fmt(1-mul.pBgivenA) : 'P(B\u2032|A)')">
+                        </text>
+                        <circle cx="315" cy="102" r="4" fill="var(--tc-text-muted)" />
+                        <text x="322" y="106" fill="var(--tc-text-muted)" font-size="11">A ∩ B′</text>
+
+                        <!-- Legend box -->
+                        <rect x="280" y="250" width="170" height="38" rx="6"
+                              fill="var(--tc-bg-elevated)" stroke="var(--tc-border)" stroke-width="1" />
+                        <text x="365" y="268" text-anchor="middle" fill="var(--tc-text-muted)" font-size="10">
+                            <tspan x-text="mul.independent ? 'Independent events' : 'Dependent events'"></tspan>
+                        </text>
+                        <text x="365" y="282" text-anchor="middle" fill="var(--tc-text-muted)" font-size="10"
+                              x-text="mul.independent ? 'P(A∩B) = P(A) × P(B)' : 'P(A∩B) = P(A) × P(B|A)'"></text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 5 — Experimental Probability (Simulation)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'experimental'" x-transition>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Experimental Probability</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Run trials and observe how experimental probability converges to theoretical probability
+                        as the number of trials increases (Law of Large Numbers).
+                    </p>
+
+                    <!-- Experiment type -->
+                    <div class="mb-3">
+                        <label class="form-label">Experiment</label>
+                        <select class="form-select" x-model="exp.type" @@change="resetExperiment()">
+                            <option value="coin">Coin Flip (P = 0.5)</option>
+                            <option value="die">Dice Roll — specific number (P = 1/6)</option>
+                            <option value="custom">Custom probability</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" x-show="exp.type === 'custom'">
+                        <label class="form-label">Theoretical P(success)</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="exp.customP" @@input="resetExperiment()" />
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(1)">+1 Trial</button>
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(10)">+10</button>
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(100)">+100</button>
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(1000)">+1000</button>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary w-100 mb-3"
+                            @@click="resetExperiment()">Reset</button>
+
+                    <div class="prob-result-card">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Total trials</span>
+                            <span class="prob-stat-value" x-text="exp.total"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Successes</span>
+                            <span class="prob-stat-value" x-text="exp.successes"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Experimental P</span>
+                            <span class="prob-stat-value"
+                                  x-text="exp.total > 0 ? fmt(exp.successes / exp.total) : '—'"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Theoretical P</span>
+                            <span class="prob-stat-value" x-text="fmt(getTheoreticalP())"></span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="prob-stat-label">Difference</span>
+                            <span class="prob-stat-value"
+                                  x-text="exp.total > 0 ? fmt(Math.abs(exp.successes / exp.total - getTheoreticalP())) : '—'"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Convergence chart -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Convergence Chart</h2>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        Watch experimental probability (blue) approach the theoretical value (dashed line) as trials increase.
+                    </p>
+                    <div class="prob-chart-container">
+                        <canvas id="convergenceChart"></canvas>
+                    </div>
+
+                    <!-- Recent trials ribbon -->
+                    <template x-if="exp.recentResults.length > 0">
+                        <div class="mt-3">
+                            <p class="text-muted mb-1" style="font-size:.82rem;">Last 20 trials:</p>
+                            <div class="d-flex flex-wrap gap-1">
+                                <template x-for="(r, i) in exp.recentResults" :key="i">
+                                    <span class="prob-trial-pip"
+                                          :class="r ? 'prob-trial-hit' : 'prob-trial-miss'"
+                                          :title="r ? 'Success' : 'Fail'">
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Quick Reference ─── -->
+    <div class="calc-container mt-4">
+        <h2 class="calc-title">📋 Quick Reference</h2>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Basic</div>
+                    <div class="prob-ref-formula">P(A) = favourable ÷ total</div>
+                    <div class="prob-ref-note">0 ≤ P(A) ≤ 1 &nbsp;•&nbsp; ΣP = 1</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Addition (Or)</div>
+                    <div class="prob-ref-formula">P(A∪B) = P(A) + P(B) − P(A∩B)</div>
+                    <div class="prob-ref-note">Mutually exclusive: P(A∪B) = P(A) + P(B)</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Multiplication (And)</div>
+                    <div class="prob-ref-formula">P(A∩B) = P(A) × P(B|A)</div>
+                    <div class="prob-ref-note">Independent: P(A∩B) = P(A) × P(B)</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Conditional</div>
+                    <div class="prob-ref-formula">P(A|B) = P(A∩B) ÷ P(B)</div>
+                    <div class="prob-ref-note">Given B has occurred</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Bayes' Theorem</div>
+                    <div class="prob-ref-formula">P(B|A) = P(A|B)·P(B) ÷ P(A)</div>
+                    <div class="prob-ref-note">Reverse conditional reasoning</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Complement</div>
+                    <div class="prob-ref-formula">P(A′) = 1 − P(A)</div>
+                    <div class="prob-ref-note">Probability of "not A"</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function probabilityApp() {
+    let convergenceChart = null;
+
+    return {
+        tab: 'basic',
+
+        // ── Basic ──
+        basic: { favourable: 3, total: 6, probability: null, error: null },
+
+        // ── Conditional ──
+        cond: { pAB: 0.15, pB: 0.4, pA: null, result: null, pBgivenA: null, error: null },
+
+        // ── Addition ──
+        add: { pA: 0.3, pB: 0.5, pAB: 0.1, mutuallyExclusive: false, result: null, error: null },
+
+        // ── Multiplication ──
+        mul: { pA: 0.6, pB: 0.3, pBgivenA: 0.5, independent: true, result: null, error: null },
+
+        // ── Experimental ──
+        exp: { type: 'coin', customP: 0.5, total: 0, successes: 0, history: [], recentResults: [] },
+
+        init() {
+            this.computeBasic();
+            this.computeConditional();
+            this.computeAddition();
+            this.computeMultiplication();
+            this.initConvergenceChart();
+        },
+
+        fmt(v) { return v == null ? '—' : +parseFloat(v).toFixed(6) + ''; },
+
+        // ── Basic ──
+        computeBasic() {
+            this.basic.error = null;
+            this.basic.probability = null;
+            const f = this.basic.favourable, t = this.basic.total;
+            if (t == null || t <= 0) { this.basic.error = 'Total must be > 0.'; return; }
+            if (f == null || f < 0) { this.basic.error = 'Favourable must be ≥ 0.'; return; }
+            if (f > t) { this.basic.error = 'Favourable cannot exceed total.'; return; }
+            this.basic.probability = f / t;
+        },
+
+        // ── Conditional ──
+        computeConditional() {
+            this.cond.error = null;
+            this.cond.result = null;
+            this.cond.pBgivenA = null;
+            const pAB = this.cond.pAB, pB = this.cond.pB, pA = this.cond.pA;
+            if (pAB == null || pB == null) return;
+            if (pB <= 0) { this.cond.error = 'P(B) must be > 0.'; return; }
+            if (pAB < 0 || pAB > 1 || pB < 0 || pB > 1) { this.cond.error = 'Probabilities must be between 0 and 1.'; return; }
+            if (pAB > pB) { this.cond.error = 'P(A∩B) cannot exceed P(B).'; return; }
+            this.cond.result = pAB / pB;
+            // Bayes' theorem if P(A) given
+            if (pA != null && pA > 0 && pA <= 1 && pAB <= pA) {
+                this.cond.pBgivenA = pAB / pA;
+            }
+        },
+
+        // ── Addition ──
+        computeAddition() {
+            this.add.error = null;
+            this.add.result = null;
+            const pA = this.add.pA, pB = this.add.pB;
+            const pAB = this.add.mutuallyExclusive ? 0 : this.add.pAB;
+            if (pA == null || pB == null) return;
+            if (pA < 0 || pA > 1 || pB < 0 || pB > 1) { this.add.error = 'Probabilities must be between 0 and 1.'; return; }
+            if (!this.add.mutuallyExclusive && (pAB == null || pAB < 0 || pAB > 1)) { this.add.error = 'P(A∩B) must be between 0 and 1.'; return; }
+            if (pAB > pA || pAB > pB) { this.add.error = 'P(A∩B) cannot exceed P(A) or P(B).'; return; }
+            const r = pA + pB - pAB;
+            if (r > 1.0001) { this.add.error = 'Result exceeds 1 — check your inputs.'; return; }
+            this.add.result = Math.min(r, 1);
+        },
+
+        // ── Multiplication ──
+        computeMultiplication() {
+            this.mul.error = null;
+            this.mul.result = null;
+            const pA = this.mul.pA;
+            if (pA == null || pA < 0 || pA > 1) { this.mul.error = 'P(A) must be between 0 and 1.'; return; }
+            if (this.mul.independent) {
+                const pB = this.mul.pB;
+                if (pB == null || pB < 0 || pB > 1) { this.mul.error = 'P(B) must be between 0 and 1.'; return; }
+                this.mul.result = pA * pB;
+            } else {
+                const pBgA = this.mul.pBgivenA;
+                if (pBgA == null || pBgA < 0 || pBgA > 1) { this.mul.error = 'P(B|A) must be between 0 and 1.'; return; }
+                this.mul.result = pA * pBgA;
+            }
+        },
+
+        // ── Experimental ──
+        getTheoreticalP() {
+            if (this.exp.type === 'coin') return 0.5;
+            if (this.exp.type === 'die') return 1 / 6;
+            return this.exp.customP || 0;
+        },
+
+        runTrials(n) {
+            const p = this.getTheoreticalP();
+            for (let i = 0; i < n; i++) {
+                const success = Math.random() < p;
+                if (success) this.exp.successes++;
+                this.exp.total++;
+                // Track recent results (last 20)
+                this.exp.recentResults.push(success);
+                if (this.exp.recentResults.length > 20) this.exp.recentResults.shift();
+                // Record data-point every so often for the chart
+                if (this.exp.total <= 20 || this.exp.total % Math.max(1, Math.floor(n / 20)) === 0 || i === n - 1) {
+                    this.exp.history.push({ trial: this.exp.total, prob: this.exp.successes / this.exp.total });
+                }
+            }
+            this.updateConvergenceChart();
+        },
+
+        resetExperiment() {
+            this.exp.total = 0;
+            this.exp.successes = 0;
+            this.exp.history = [];
+            this.exp.recentResults = [];
+            this.updateConvergenceChart();
+        },
+
+        // ── Chart ──
+        initConvergenceChart() {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('convergenceChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                const ctx = canvas.getContext('2d');
+                convergenceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Experimental P',
+                                data: [],
+                                borderColor: 'rgba(79,110,247,1)',
+                                backgroundColor: 'rgba(79,110,247,0.1)',
+                                fill: false,
+                                tension: 0.3,
+                                pointRadius: 0,
+                                borderWidth: 2,
+                            },
+                            {
+                                label: 'Theoretical P',
+                                data: [],
+                                borderColor: 'rgba(231,76,60,0.7)',
+                                borderDash: [6, 4],
+                                fill: false,
+                                pointRadius: 0,
+                                borderWidth: 2,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 200 },
+                        plugins: { legend: { display: true, labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } } },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Trials', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)', maxTicksLimit: 10 },
+                                grid: { color: 'var(--tc-border)' }
+                            },
+                            y: {
+                                min: 0, max: 1,
+                                title: { display: true, text: 'Probability', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { color: 'var(--tc-border)' }
+                            }
+                        }
+                    }
+                });
+            });
+        },
+
+        updateConvergenceChart() {
+            if (!convergenceChart) return;
+            const p = this.getTheoreticalP();
+            convergenceChart.data.labels = this.exp.history.map(h => h.trial);
+            convergenceChart.data.datasets[0].data = this.exp.history.map(h => h.prob);
+            convergenceChart.data.datasets[1].data = this.exp.history.map(() => p);
+            convergenceChart.update();
+        }
+    };
+}
+</script>

@@ -39,6 +39,7 @@
                         <li><a class="tc-pill @(pageName == "/Graphing" ? "active" : "")" asp-page="/Graphing">Graphing</a></li>
                         <li><a class="tc-pill @(pageName == "/Geometry" ? "active" : "")" asp-page="/Geometry">Geometry</a></li>
                         <li><a class="tc-pill @(pageName == "/Statistics" ? "active" : "")" asp-page="/Statistics">Statistics</a></li>
+                        <li><a class="tc-pill @(pageName == "/Probability" ? "active" : "")" asp-page="/Probability">Probability</a></li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li><a class="tc-pill @(pageName == "/Dashboard" ? "active" : "")" asp-page="/Dashboard">Dashboard</a></li>

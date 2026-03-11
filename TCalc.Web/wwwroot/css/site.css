@@ -937,6 +937,93 @@ a:hover {
   border-top: 1px solid var(--tc-border);
 }
 
+/* ---------- Probability page — sample space cells ---------- */
+
+.prob-sample-cell {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: .25rem;
+  background: var(--tc-bg-secondary);
+  border: 1px solid var(--tc-border);
+  transition: background .15s ease, border-color .15s ease;
+}
+.prob-sample-hit {
+  background: var(--tc-primary);
+  border-color: var(--tc-primary);
+}
+
+/* ---------- Probability page — trial pips ---------- */
+
+.prob-trial-pip {
+  display: inline-block;
+  width: .75rem;
+  height: .75rem;
+  border-radius: 50%;
+  border: 1px solid var(--tc-border);
+  background: var(--tc-bg-secondary);
+  transition: background .15s ease;
+}
+.prob-trial-hit {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+.prob-trial-miss {
+  background: #e74c3c;
+  border-color: #e74c3c;
+}
+
+/* ---------- Probability page — convergence chart ---------- */
+
+.prob-chart-container {
+  background: var(--tc-bg-elevated);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  height: 16rem;
+  position: relative;
+  transition: background .25s ease, border-color .25s ease;
+}
+.prob-chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---------- Probability page — reference cards ---------- */
+
+.prob-ref-card {
+  background: var(--tc-bg-elevated);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  height: 100%;
+  transition: background .25s ease, border-color .25s ease;
+}
+.prob-ref-card:hover {
+  border-color: var(--tc-accent);
+}
+
+.prob-ref-title {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--tc-primary);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .25rem;
+}
+
+.prob-ref-formula {
+  font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--tc-text);
+  margin-bottom: .25rem;
+}
+
+.prob-ref-note {
+  font-size: .78rem;
+  color: var(--tc-text-muted);
+}
+
 /* ---------- Geometry calculator ---------- */
 
 .geo-svg {
