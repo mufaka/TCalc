@@ -1024,6 +1024,81 @@ a:hover {
   color: var(--tc-text-muted);
 }
 
+/* Probability distribution table */
+.prob-dist-table th {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--tc-text-muted);
+  border-bottom-width: 2px;
+}
+
+.prob-dist-table td {
+  vertical-align: middle;
+}
+
+.prob-dist-table input.form-control-sm {
+  font-size: .85rem;
+}
+
+/* Joint probability table */
+.prob-joint-table input[type="number"] {
+  width: 72px;
+  text-align: center;
+}
+
+.prob-joint-label {
+  font-size: .82rem !important;
+  font-weight: 600;
+  background: transparent !important;
+  border: 1px dashed var(--tc-border) !important;
+}
+
+.prob-joint-label:focus {
+  border-style: solid !important;
+}
+
+.prob-joint-corner {
+  font-size: .78rem;
+  color: var(--tc-text-muted);
+  white-space: nowrap;
+}
+
+.prob-joint-marginal {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--tc-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.prob-joint-marginal-hdr {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--tc-text-muted);
+  font-style: italic;
+}
+
+.prob-joint-grand {
+  font-size: .85rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.prob-joint-selected {
+  box-shadow: 0 0 0 2px var(--tc-accent) !important;
+  border-color: var(--tc-accent) !important;
+}
+
+.prob-joint-heatmap-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.prob-joint-heatmap {
+  width: 100%;
+  max-height: 320px;
+}
+
 /* ---------- Geometry calculator ---------- */
 
 .geo-svg {
