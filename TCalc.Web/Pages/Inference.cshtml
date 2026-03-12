@@ -1,0 +1,2590 @@
+﻿@page
+@model TCalc.Web.Pages.InferenceModel
+@{
+    ViewData["Title"] = "Inference";
+}
+
+<div x-data="inferenceApp()" x-cloak>
+
+    <!-- ─── Header ─── -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+        <div>
+            <h1 class="calc-title mb-0">🔍 Inference</h1>
+            <p class="text-muted mb-0" style="font-size:.9rem;">
+                Statistical reasoning: updating beliefs, testing hypotheses, and estimating parameters
+            </p>
+        </div>
+    </div>
+
+    <!-- ─── Section Tabs ─── -->
+    <div class="prob-type-selector mb-4">
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'bayesian' && 'active'"
+                @@click="tab = 'bayesian'">Bayesian Updater</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'hypothesis' && 'active'"
+                @@click="tab = 'hypothesis'">Hypothesis Testing</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'mle' && 'active'"
+                @@click="tab = 'mle'">Maximum Likelihood</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'confidence' && 'active'"
+                @@click="tab = 'confidence'">Confidence Intervals</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'nonparametric' && 'active'"
+                @@click="tab = 'nonparametric'">Non-Parametric Methods</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 1 — Bayesian Updater
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'bayesian'" x-transition>
+
+        <!-- Hidden form for HTMX -->
+        <form id="bayesianForm" method="post" asp-page-handler="BayesianUpdate" style="display:none;">
+            <input type="hidden" name="priorAlpha" />
+            <input type="hidden" name="priorBeta" />
+            <input type="hidden" name="successes" />
+            <input type="hidden" name="trials" />
+        </form>
+
+        <div class="row g-4">
+            <!-- ─── Left Column: Controls ─── -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">🔄 Bayesian Updater</h2>
+                    <p class="text-muted mb-3" style="font-size:.85rem;">
+                        Watch how beliefs evolve as evidence accumulates.
+                    </p>
+
+                    <!-- Prior Selector -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Prior Distribution</label>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button type="button" class="btn btn-sm"
+                                    :class="bay.priorPreset === 'uniform' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="baySetPreset('uniform')">Uniform (No Prior)</button>
+                            <button type="button" class="btn btn-sm"
+                                    :class="bay.priorPreset === 'neutral' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="baySetPreset('neutral')">Neutral</button>
+                            <button type="button" class="btn btn-sm"
+                                    :class="bay.priorPreset === 'believer' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="baySetPreset('believer')">Believer</button>
+                            <button type="button" class="btn btn-sm"
+                                    :class="bay.priorPreset === 'skeptic' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="baySetPreset('skeptic')">Skeptic</button>
+                            <button type="button" class="btn btn-sm"
+                                    :class="bay.priorPreset === 'custom' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="bay.priorPreset = 'custom'">Custom</button>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">α (alpha)</label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="bay.alpha"
+                                       min="0.01" step="0.5" @@change="bay.priorPreset = 'custom'">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">β (beta)</label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="bay.beta"
+                                       min="0.01" step="0.5" @@change="bay.priorPreset = 'custom'">
+                            </div>
+                        </div>
+                        <div class="text-muted mt-1" style="font-size:.8rem;">
+                            Prior: Beta(<span x-text="bay.alpha"></span>, <span x-text="bay.beta"></span>)
+                        </div>
+                    </div>
+
+                    <!-- Evidence Input -->
+                    <div class="mb-3" style="border-top:1px solid var(--tc-border);padding-top:.75rem;">
+                        <label class="form-label fw-semibold">Evidence</label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Successes (k)</label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="bay.successes"
+                                       min="0" step="1">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Trials (n)</label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="bay.trials"
+                                       min="1" step="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="btn btn-primary btn-sm"
+                                @@click="bayUpdate()" :disabled="bay.loading">
+                            <span x-show="bay.loading" class="spinner-border spinner-border-sm me-1"></span>
+                            Update Posterior
+                        </button>
+                        <button type="button" class="btn btn-success btn-sm"
+                                @@click="baySequentialUpdate()" :disabled="bay.loading || !bay.hasResult"
+                                title="Use current posterior as new prior, then update with new evidence">
+                            ➕ Sequential Update
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="bayReset()">Reset</button>
+                    </div>
+
+                    <!-- Results -->
+                    <div x-show="bay.hasResult" x-transition>
+                        <div style="border-top:1px solid var(--tc-border);padding-top:.75rem;">
+                            <h6 class="fw-semibold mb-2">Results</h6>
+                            <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Posterior</div>
+                                    <div class="prob-result-value">Beta(<span x-text="bay.postAlpha"></span>, <span x-text="bay.postBeta"></span>)</div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Posterior Mean</div>
+                                    <div class="prob-result-value" x-text="bay.postMean"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">95% Credible Interval</div>
+                                    <div class="prob-result-value">[<span x-text="bay.credLower"></span>, <span x-text="bay.credUpper"></span>]</div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Update Round</div>
+                                    <div class="prob-result-value" x-text="bay.round"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Update History (sequential mode) -->
+                    <div x-show="bay.history.length > 1" x-transition class="mt-3">
+                        <h6 class="fw-semibold mb-2" style="font-size:.85rem;">Sequential Update History</h6>
+                        <div class="table-responsive" style="max-height:200px;overflow-y:auto;">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:.8rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Round</th>
+                                        <th>Prior</th>
+                                        <th>Evidence</th>
+                                        <th>Posterior</th>
+                                        <th>Mean</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(h, i) in bay.history" :key="i">
+                                        <tr>
+                                            <td x-text="i + 1"></td>
+                                            <td>Beta(<span x-text="h.priorA"></span>, <span x-text="h.priorB"></span>)</td>
+                                            <td><span x-text="h.k"></span>/<span x-text="h.n"></span></td>
+                                            <td>Beta(<span x-text="h.postA"></span>, <span x-text="h.postB"></span>)</td>
+                                            <td x-text="h.mean"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teaching Callout -->
+                <div class="calc-container mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-info w-100"
+                            data-bs-toggle="collapse" data-bs-target="#bayesianLearn">
+                        💡 Learn — How Bayesian Updating Works
+                    </button>
+                    <div class="collapse mt-3" id="bayesianLearn">
+                        <div class="prob-teach-card">
+                            <strong>Posterior ∝ Likelihood × Prior</strong>
+                            <p class="mb-2 mt-2">Bayesian updating combines your prior belief about a parameter with
+                            the evidence from observed data to produce a posterior belief.</p>
+                            <ul class="mb-2" style="font-size:.85rem;">
+                                <li><strong>Prior:</strong> Your initial belief about the probability θ, modeled as Beta(α, β)</li>
+                                <li><strong>Likelihood:</strong> How probable the observed data is for each possible θ</li>
+                                <li><strong>Posterior:</strong> Your updated belief — always Beta(α + k, β + n − k) for binomial data</li>
+                            </ul>
+                            <p class="mb-2" style="font-size:.85rem;">
+                                <strong>Key insight:</strong> With more data, the posterior becomes increasingly concentrated
+                                regardless of the prior. The data "overwhelms" the prior — this is why Bayesian and frequentist
+                                methods tend to agree with large samples.
+                            </p>
+                            <p class="mb-0" style="font-size:.85rem;">
+                                <strong>Sequential updating:</strong> You can feed evidence in batches. After each update,
+                                the posterior becomes the next round's prior. The final result is identical to using all
+                                evidence at once — Bayesian updating is <em>coherent</em>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Right Column: Chart ─── -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h6 class="fw-semibold mb-2">Prior / Likelihood / Posterior</h6>
+                    <div style="position:relative;height:400px;">
+                        <canvas id="bayesianChart"></canvas>
+                    </div>
+                    <div class="d-flex justify-content-center gap-3 mt-2" style="font-size:.8rem;">
+                        <span><span style="display:inline-block;width:20px;height:3px;background:#6c757d;vertical-align:middle;border-top:2px dashed #6c757d;"></span> Prior</span>
+                        <span><span style="display:inline-block;width:20px;height:3px;background:#ffc107;vertical-align:middle;border-top:2px dotted #ffc107;"></span> Likelihood</span>
+                        <span><span style="display:inline-block;width:20px;height:3px;background:var(--tc-primary);vertical-align:middle;"></span> Posterior</span>
+                    </div>
+                </div>
+
+                <!-- Preset Examples -->
+                <div class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">Try These Examples</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="bayLoadExample('coin')">🪙 Fair Coin? (6H in 10 flips)</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="bayLoadExample('drug')">💊 Drug Trial (45/50 cured)</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="bayLoadExample('rare')">🎲 Rare Event (2/1000)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 2 — Hypothesis Testing Calculator
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'hypothesis'" x-transition>
+
+        <!-- Hidden forms for HTMX -->
+        <form id="zTestForm" method="post" asp-page-handler="ZTest" style="display:none;">
+            <input type="hidden" name="sampleMean" />
+            <input type="hidden" name="populationMean" />
+            <input type="hidden" name="populationStdDev" />
+            <input type="hidden" name="sampleSize" />
+            <input type="hidden" name="alpha" />
+            <input type="hidden" name="alternative" />
+        </form>
+        <form id="tTestForm" method="post" asp-page-handler="TTest" style="display:none;">
+            <input type="hidden" name="sampleMean" />
+            <input type="hidden" name="populationMean" />
+            <input type="hidden" name="sampleStdDev" />
+            <input type="hidden" name="sampleSize" />
+            <input type="hidden" name="alpha" />
+            <input type="hidden" name="alternative" />
+        </form>
+        <form id="chiSquareForm" method="post" asp-page-handler="ChiSquareTest" style="display:none;">
+            <input type="hidden" name="observedJson" />
+            <input type="hidden" name="expectedJson" />
+            <input type="hidden" name="alpha" />
+        </form>
+
+        <div class="row g-4">
+            <!-- ─── Left Column: Controls ─── -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">📊 Hypothesis Testing</h2>
+                    <p class="text-muted mb-3" style="font-size:.85rem;">
+                        Step-by-step hypothesis test calculator with visual p-value.
+                    </p>
+
+                    <!-- Test Type Selector -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Test Type</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm"
+                                    :class="ht.testType === 'z' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="htSetTestType('z')">Z-Test</button>
+                            <button type="button" class="btn btn-sm"
+                                    :class="ht.testType === 't' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="htSetTestType('t')">T-Test</button>
+                            <button type="button" class="btn btn-sm"
+                                    :class="ht.testType === 'chi2' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="htSetTestType('chi2')">Chi-Square</button>
+                        </div>
+                    </div>
+
+                    <!-- Z-Test / T-Test Inputs -->
+                    <div x-show="ht.testType !== 'chi2'">
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small">Sample Mean (x̄)</label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="ht.sampleMean" step="any">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Population Mean (μ₀)</label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="ht.popMean" step="any">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small" x-text="ht.testType === 'z' ? 'Population σ' : 'Sample s'"></label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="ht.stdDev" min="0.001" step="any">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Sample Size (n)</label>
+                                <input type="number" class="form-control form-control-sm" x-model.number="ht.sampleSize" min="2" step="1">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small">Significance (α)</label>
+                                <select class="form-select form-select-sm" x-model="ht.alpha">
+                                    <option value="0.01">0.01</option>
+                                    <option value="0.05">0.05</option>
+                                    <option value="0.10">0.10</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Alternative (Hₐ)</label>
+                                <select class="form-select form-select-sm" x-model="ht.alternative">
+                                    <option value="two-tailed">Two-tailed (μ ≠ μ₀)</option>
+                                    <option value="left">Left-tailed (μ &lt; μ₀)</option>
+                                    <option value="right">Right-tailed (μ &gt; μ₀)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chi-Square Inputs -->
+                    <div x-show="ht.testType === 'chi2'">
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Categories</label>
+                            <div class="d-flex gap-2 mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        @@click="htAddCategory()" :disabled="ht.categories.length >= 10">+ Add</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        @@click="htRemoveCategory()" :disabled="ht.categories.length <= 2">− Remove</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0" style="font-size:.85rem;">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Observed</th>
+                                            <th>Expected</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="(cat, i) in ht.categories" :key="i">
+                                            <tr>
+                                                <td x-text="'Cat ' + (i + 1)" style="width:80px;"></td>
+                                                <td><input type="number" class="form-control form-control-sm" x-model.number="ht.categories[i].obs" min="0" step="1"></td>
+                                                <td><input type="number" class="form-control form-control-sm" x-model.number="ht.categories[i].exp" min="0.001" step="any"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Significance (α)</label>
+                            <select class="form-select form-select-sm" x-model="ht.alpha" style="max-width:120px;">
+                                <option value="0.01">0.01</option>
+                                <option value="0.05">0.05</option>
+                                <option value="0.10">0.10</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap gap-2 mt-3 mb-3">
+                        <button type="button" class="btn btn-primary btn-sm"
+                                @@click="htRunTest()" :disabled="ht.loading">
+                            <span x-show="ht.loading" class="spinner-border spinner-border-sm me-1"></span>
+                            Run Test
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="htReset()">Reset</button>
+                    </div>
+
+                    <!-- Results -->
+                    <div x-show="ht.hasResult" x-transition>
+                        <div style="border-top:1px solid var(--tc-border);padding-top:.75rem;">
+                            <h6 class="fw-semibold mb-2">Results</h6>
+                            <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Test Statistic</div>
+                                    <div class="prob-result-value" x-text="ht.testStat"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">P-Value</div>
+                                    <div class="prob-result-value" x-text="ht.pValue"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Critical Value</div>
+                                    <div class="prob-result-value" x-text="ht.criticalValue"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label" x-show="ht.testType !== 'chi2'">Alternative</div>
+                                    <div class="prob-result-label" x-show="ht.testType === 'chi2'">Degrees of Freedom</div>
+                                    <div class="prob-result-value" x-show="ht.testType !== 'chi2'" x-text="ht.altDisplay"></div>
+                                    <div class="prob-result-value" x-show="ht.testType === 'chi2'" x-text="ht.df"></div>
+                                </div>
+                            </div>
+
+                            <!-- Decision Banner -->
+                            <div class="mt-3 p-2 rounded text-center fw-semibold" style="font-size:.9rem;"
+                                 :style="ht.reject ? 'background:rgba(220,53,69,.12);color:#dc3545;border:1px solid rgba(220,53,69,.3);' : 'background:rgba(25,135,84,.12);color:#198754;border:1px solid rgba(25,135,84,.3);'">
+                                <span x-show="ht.reject">✗ Reject H₀ — evidence supports Hₐ at α = <span x-text="ht.alphaUsed"></span></span>
+                                <span x-show="!ht.reject">✓ Fail to Reject H₀ — insufficient evidence at α = <span x-text="ht.alphaUsed"></span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step-by-step Explanation -->
+                <div x-show="ht.hasResult" x-transition class="calc-container mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-info w-100"
+                            data-bs-toggle="collapse" data-bs-target="#htSteps">
+                        📝 Explain Steps
+                    </button>
+                    <div class="collapse mt-3" id="htSteps">
+                        <div class="prob-teach-card" style="font-size:.85rem;">
+                            <ol class="mb-0">
+                                <li class="mb-2">
+                                    <strong>State hypotheses:</strong><br>
+                                    <span x-show="ht.testType !== 'chi2'">
+                                        H₀: μ = <span x-text="ht.popMean"></span><br>
+                                        Hₐ: μ <span x-text="ht.altSymbol"></span> <span x-text="ht.popMean"></span>
+                                    </span>
+                                    <span x-show="ht.testType === 'chi2'">
+                                        H₀: Observed frequencies match expected frequencies<br>
+                                        Hₐ: Observed frequencies do not match expected frequencies
+                                    </span>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Choose significance level:</strong> α = <span x-text="ht.alphaUsed"></span>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Compute test statistic:</strong>
+                                    <span x-show="ht.testType === 'z'">z = (x̄ − μ₀) / (σ/√n) = <span x-text="ht.testStat"></span></span>
+                                    <span x-show="ht.testType === 't'">t = (x̄ − μ₀) / (s/√n) = <span x-text="ht.testStat"></span> (df = <span x-text="ht.df"></span>)</span>
+                                    <span x-show="ht.testType === 'chi2'">χ² = Σ(Oᵢ − Eᵢ)²/Eᵢ = <span x-text="ht.testStat"></span> (df = <span x-text="ht.df"></span>)</span>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Find p-value:</strong> p = <span x-text="ht.pValue"></span>
+                                </li>
+                                <li class="mb-0">
+                                    <strong>Decision:</strong>
+                                    <span x-show="ht.reject">Since p = <span x-text="ht.pValue"></span> &lt; α = <span x-text="ht.alphaUsed"></span>, we <strong>reject H₀</strong>.</span>
+                                    <span x-show="!ht.reject">Since p = <span x-text="ht.pValue"></span> ≥ α = <span x-text="ht.alphaUsed"></span>, we <strong>fail to reject H₀</strong>.</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teaching Callout -->
+                <div class="calc-container mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-info w-100"
+                            data-bs-toggle="collapse" data-bs-target="#htLearn">
+                        💡 Learn — Understanding Hypothesis Testing
+                    </button>
+                    <div class="collapse mt-3" id="htLearn">
+                        <div class="prob-teach-card">
+                            <p class="mb-2"><strong>A small p-value means the observed data is unlikely under H₀ —
+                            it does NOT prove Hₐ is true.</strong></p>
+                            <ul class="mb-2" style="font-size:.85rem;">
+                                <li><strong>Type I Error (α):</strong> Rejecting H₀ when it's actually true (false positive)</li>
+                                <li><strong>Type II Error (β):</strong> Failing to reject H₀ when Hₐ is actually true (false negative)</li>
+                                <li><strong>Power (1 − β):</strong> Probability of correctly detecting a real effect</li>
+                            </ul>
+                            <p class="mb-2" style="font-size:.85rem;">
+                                <strong>Z-test vs T-test:</strong> Use the z-test when the population σ is <em>known</em>.
+                                Use the t-test when you estimate σ from the sample (which is almost always the case in practice).
+                                The t-distribution has heavier tails, accounting for the extra uncertainty.
+                            </p>
+                            <p class="mb-0" style="font-size:.85rem;">
+                                <strong>Chi-square test:</strong> Tests whether observed frequencies differ significantly
+                                from expected frequencies. Common for categorical data and goodness-of-fit testing.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Right Column: Chart + Error Visualizer ─── -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h6 class="fw-semibold mb-2">
+                        <span x-show="ht.testType === 'z'">Standard Normal Distribution (Z)</span>
+                        <span x-show="ht.testType === 't'">T-Distribution (df = <span x-text="ht.df || '—'"></span>)</span>
+                        <span x-show="ht.testType === 'chi2'">Chi-Square Results</span>
+                    </h6>
+                    <!-- Z/T distribution chart -->
+                    <div x-show="ht.testType !== 'chi2'" style="position:relative;height:380px;">
+                        <canvas id="hypothesisChart"></canvas>
+                    </div>
+                    <!-- Chi-Square summary (no distribution curve) -->
+                    <div x-show="ht.testType === 'chi2' && ht.hasResult" class="p-3">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered" style="font-size:.85rem;">
+                                <thead>
+                                    <tr><th>Category</th><th>Observed</th><th>Expected</th><th>(O−E)²/E</th></tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(cat, i) in ht.categories" :key="'chi'+i">
+                                        <tr>
+                                            <td x-text="'Cat ' + (i+1)"></td>
+                                            <td x-text="cat.obs"></td>
+                                            <td x-text="cat.exp"></td>
+                                            <td x-text="((cat.obs - cat.exp) ** 2 / cat.exp).toFixed(4)"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="fw-semibold">
+                                        <td colspan="3">χ² Statistic</td>
+                                        <td x-text="ht.testStat"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    <div x-show="ht.testType === 'chi2' && !ht.hasResult" class="text-center text-muted py-4">
+                        Enter observed and expected frequencies, then click "Run Test".
+                    </div>
+                </div>
+
+                <!-- Type I / Type II Error Visualizer -->
+                <div x-show="ht.testType !== 'chi2'" class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">Type I &amp; Type II Error Visualizer</h6>
+                    <p class="text-muted mb-2" style="font-size:.8rem;">
+                        Adjust the true effect size (δ) to see how α (rejection region) and β (Type II error) change.
+                    </p>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">True Effect Size (δ = μ − μ₀)</label>
+                            <input type="range" class="form-range" x-model.number="ht.effectSize"
+                                   min="0" max="5" step="0.1"
+                                   @@input="htDrawErrorChart()">
+                            <div class="text-muted" style="font-size:.8rem;">δ = <span x-text="ht.effectSize.toFixed(1)"></span></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;font-size:.8rem;">
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Power (1−β)</div>
+                                    <div class="prob-result-value" x-text="ht.power"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">β (Type II)</div>
+                                    <div class="prob-result-value" x-text="ht.betaError"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="position:relative;height:280px;">
+                        <canvas id="errorChart"></canvas>
+                    </div>
+                    <div class="d-flex justify-content-center gap-3 mt-2" style="font-size:.8rem;">
+                        <span><span style="display:inline-block;width:20px;height:10px;background:rgba(220,53,69,.25);border:1px solid #dc3545;vertical-align:middle;"></span> α (Type I)</span>
+                        <span><span style="display:inline-block;width:20px;height:10px;background:rgba(255,193,7,.25);border:1px solid #ffc107;vertical-align:middle;"></span> β (Type II)</span>
+                    </div>
+                </div>
+
+                <!-- Preset Examples -->
+                <div class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">Try These Examples</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="htLoadExample('mean')">📏 Mean Test (z)</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="htLoadExample('small')">🔬 Small Sample (t)</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="htLoadExample('dice')">🎲 Fair Dice? (χ²)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 3 — Maximum Likelihood Estimation
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'mle'" x-transition>
+
+        <!-- Hidden forms -->
+        <form id="mleNormalForm" method="post" asp-page-handler="MleNormal" style="display:none;">
+            <input type="hidden" name="dataJson" />
+        </form>
+        <form id="mleBinomialForm" method="post" asp-page-handler="MleBinomial" style="display:none;">
+            <input type="hidden" name="trials" />
+            <input type="hidden" name="successes" />
+        </form>
+
+        <div class="row g-4">
+            <!-- ─── Left Column: Controls ─── -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">📈 Maximum Likelihood Estimation</h2>
+                    <p class="text-muted mb-3" style="font-size:.85rem;">
+                        Find the parameter values that make your observed data most probable.
+                    </p>
+
+                    <!-- Distribution Selector -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Distribution</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm"
+                                    :class="mle.distType === 'normal' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="mle.distType = 'normal'">Normal (μ, σ)</button>
+                            <button type="button" class="btn btn-sm"
+                                    :class="mle.distType === 'binomial' ? 'btn-primary' : 'btn-outline-secondary'"
+                                    @@click="mle.distType = 'binomial'">Binomial (p)</button>
+                        </div>
+                    </div>
+
+                    <!-- Normal: Data Input -->
+                    <div x-show="mle.distType === 'normal'">
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Observed Data</label>
+                            <textarea class="form-control form-control-sm" rows="3"
+                                      x-model="mle.dataText"
+                                      placeholder="Enter comma-separated values, e.g.: 4.2, 5.1, 3.8, 4.9, 5.3"
+                                      style="font-size:.85rem;"></textarea>
+                            <div class="text-muted mt-1" style="font-size:.8rem;">
+                                <span x-text="mle.dataText.split(/[,\\s\\n]+/).filter(s => s.trim() && !isNaN(parseFloat(s))).length"></span> values parsed
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    @@click="mleLoadPreset('heights')">📏 Heights</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    @@click="mleLoadPreset('scores')">📝 Test Scores</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    @@click="mleLoadPreset('temps')">🌡️ Temperatures</button>
+                        </div>
+                    </div>
+
+                    <!-- Binomial: Inputs -->
+                    <div x-show="mle.distType === 'binomial'">
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small">Trials (n)</label>
+                                <input type="number" class="form-control form-control-sm"
+                                       x-model.number="mle.binTrials" min="1" step="1">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Successes (k)</label>
+                                <input type="number" class="form-control form-control-sm"
+                                       x-model.number="mle.binSuccesses" min="0" step="1">
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    @@click="mleLoadPreset('coin')">🪙 Coin (60/100)</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    @@click="mleLoadPreset('defects')">🔧 Defects (3/50)</button>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap gap-2 mt-3 mb-3">
+                        <button type="button" class="btn btn-primary btn-sm"
+                                @@click="mleCompute()" :disabled="mle.loading">
+                            <span x-show="mle.loading" class="spinner-border spinner-border-sm me-1"></span>
+                            Compute MLE
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="mleReset()">Reset</button>
+                    </div>
+
+                    <!-- Results -->
+                    <div x-show="mle.hasResult" x-transition>
+                        <div style="border-top:1px solid var(--tc-border);padding-top:.75rem;">
+                            <h6 class="fw-semibold mb-2">MLE Estimates</h6>
+                            <div x-show="mle.distType === 'normal'" class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">μ̂ (mean)</div>
+                                    <div class="prob-result-value" x-text="mle.estMean"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">σ̂ (std dev)</div>
+                                    <div class="prob-result-value" x-text="mle.estSigma"></div>
+                                </div>
+                                <div class="prob-result-item" style="grid-column:span 2;">
+                                    <div class="prob-result-label">Log-Likelihood</div>
+                                    <div class="prob-result-value" x-text="mle.logLik"></div>
+                                </div>
+                            </div>
+                            <div x-show="mle.distType === 'binomial'" class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">p̂ (probability)</div>
+                                    <div class="prob-result-value" x-text="mle.estP"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Log-Likelihood</div>
+                                    <div class="prob-result-value" x-text="mle.logLik"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teaching Callout -->
+                <div class="calc-container mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-info w-100"
+                            data-bs-toggle="collapse" data-bs-target="#mleLearn">
+                        💡 Learn — How MLE Works
+                    </button>
+                    <div class="collapse mt-3" id="mleLearn">
+                        <div class="prob-teach-card">
+                            <strong>MLE finds the parameter values that make your observed data most probable.</strong>
+                            <p class="mt-2 mb-2" style="font-size:.85rem;">
+                                Given observed data x₁, x₂, …, xₙ and a parametric model f(x|θ),
+                                the likelihood function is L(θ) = ∏ f(xᵢ|θ). The MLE is the value
+                                θ̂ that maximizes L(θ) — or equivalently, maximizes log L(θ).
+                            </p>
+                            <ul class="mb-2" style="font-size:.85rem;">
+                                <li><strong>Normal MLE:</strong> μ̂ = x̄ (sample mean), σ̂ = √(Σ(xᵢ−x̄)²/n)</li>
+                                <li><strong>Binomial MLE:</strong> p̂ = k/n (successes over trials)</li>
+                            </ul>
+                            <p class="mb-0" style="font-size:.85rem;">
+                                The log-likelihood curve/surface shows how the likelihood changes across
+                                parameter values. The peak is the MLE — your best estimate given the data.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Right Column: Charts ─── -->
+            <div class="col-lg-7">
+                <!-- Binomial: Log-Likelihood Curve -->
+                <div x-show="mle.distType === 'binomial'" class="calc-container">
+                    <h6 class="fw-semibold mb-2">Log-Likelihood Curve</h6>
+                    <div style="position:relative;height:350px;">
+                        <canvas id="mleBinomialChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Normal: Histogram + Fitted Overlay -->
+                <div x-show="mle.distType === 'normal'" class="calc-container">
+                    <h6 class="fw-semibold mb-2">Data Histogram &amp; Fitted Distribution</h6>
+                    <div style="position:relative;height:350px;">
+                        <canvas id="mleHistogramChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Normal: Contour Heatmap (simplified as text table) -->
+                <div x-show="mle.distType === 'normal' && mle.hasResult" class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">Log-Likelihood Surface (μ vs σ)</h6>
+                    <p class="text-muted mb-2" style="font-size:.8rem;">
+                        Values near the MLE (μ̂=<span x-text="mle.estMean"></span>, σ̂=<span x-text="mle.estSigma"></span>) have the highest log-likelihood.
+                        Darker cells = higher likelihood.
+                    </p>
+                    <div style="position:relative;height:300px;">
+                        <canvas id="mleContourChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 4 — Confidence Intervals
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'confidence'" x-transition>
+
+        <!-- Hidden form -->
+        <form id="ciForm" method="post" asp-page-handler="ConfidenceInterval" style="display:none;">
+            <input type="hidden" name="sampleMean" />
+            <input type="hidden" name="stdDev" />
+            <input type="hidden" name="sampleSize" />
+            <input type="hidden" name="confidenceLevel" />
+            <input type="hidden" name="isPopulationStdDev" />
+        </form>
+
+        <div class="row g-4">
+            <!-- ─── Left Column: Controls ─── -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">📏 Confidence Intervals</h2>
+                    <p class="text-muted mb-3" style="font-size:.85rem;">
+                        Compute and visualize confidence intervals for a population mean.
+                    </p>
+
+                    <!-- Inputs -->
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small">Sample Mean (x̄)</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   x-model.number="ci.sampleMean" step="any">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Std Dev</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   x-model.number="ci.stdDev" min="0.001" step="any">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small">Sample Size (n)</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   x-model.number="ci.sampleSize" min="2" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Confidence Level</label>
+                            <select class="form-select form-select-sm" x-model="ci.confLevel">
+                                <option value="0.90">90%</option>
+                                <option value="0.95">95%</option>
+                                <option value="0.99">99%</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="ciPopSigma"
+                                   x-model="ci.isPopStdDev">
+                            <label class="form-check-label small" for="ciPopSigma">
+                                Known population σ (use z-interval)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="btn btn-primary btn-sm"
+                                @@click="ciCompute()" :disabled="ci.loading">
+                            <span x-show="ci.loading" class="spinner-border spinner-border-sm me-1"></span>
+                            Compute Interval
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="ciReset()">Reset</button>
+                    </div>
+
+                    <!-- Results -->
+                    <div x-show="ci.hasResult" x-transition>
+                        <div style="border-top:1px solid var(--tc-border);padding-top:.75rem;">
+                            <h6 class="fw-semibold mb-2">Results</h6>
+                            <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Interval</div>
+                                    <div class="prob-result-value">[<span x-text="ci.lower"></span>, <span x-text="ci.upper"></span>]</div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Margin of Error</div>
+                                    <div class="prob-result-value">± <span x-text="ci.moe"></span></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Critical Value</div>
+                                    <div class="prob-result-value" x-text="ci.critVal"></div>
+                                </div>
+                                <div class="prob-result-item">
+                                    <div class="prob-result-label">Interval Type</div>
+                                    <div class="prob-result-value" x-text="ci.intervalType"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preset Examples -->
+                <div class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">Try These Examples</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="ciLoadExample('large')">📊 Large Sample (z)</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="ciLoadExample('small')">🔬 Small Sample (t)</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @@click="ciLoadExample('precise')">🎯 High Confidence (99%)</button>
+                    </div>
+                </div>
+
+                <!-- Teaching Callout -->
+                <div class="calc-container mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-info w-100"
+                            data-bs-toggle="collapse" data-bs-target="#ciLearn">
+                        💡 Learn — Understanding Confidence Intervals
+                    </button>
+                    <div class="collapse mt-3" id="ciLearn">
+                        <div class="prob-teach-card">
+                            <p class="mb-2"><strong>A 95% CI does NOT mean 95% probability the parameter is in this
+                            interval — it means if we repeated the study many times, ~95% of intervals would capture it.</strong></p>
+                            <ul class="mb-2" style="font-size:.85rem;">
+                                <li><strong>Z-interval:</strong> Used when population σ is known. CI = x̄ ± z* · σ/√n</li>
+                                <li><strong>T-interval:</strong> Used when σ is estimated from sample. CI = x̄ ± t* · s/√n</li>
+                                <li><strong>Width depends on:</strong> confidence level (higher → wider), sample size (larger → narrower), variability (more → wider)</li>
+                            </ul>
+                            <p class="mb-0" style="font-size:.85rem;">
+                                The <strong>repeated sampling demo</strong> on the right generates 100 intervals from a simulated
+                                population. About 95% of them (green) will capture the true mean, and ~5% (red) will miss it.
+                                This is what "95% confidence" really means.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Right Column: Visualizations ─── -->
+            <div class="col-lg-7">
+                <!-- Number Line Visualization -->
+                <div class="calc-container">
+                    <h6 class="fw-semibold mb-2">Interval on Number Line</h6>
+                    <div x-show="ci.hasResult" style="position:relative;height:120px;">
+                        <canvas id="ciNumberLine"></canvas>
+                    </div>
+                    <div x-show="!ci.hasResult" class="text-center text-muted py-4">
+                        Enter sample statistics and click "Compute Interval".
+                    </div>
+                </div>
+
+                <!-- Repeated Sampling Demo -->
+                <div class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">Repeated Sampling Demo</h6>
+                    <p class="text-muted mb-2" style="font-size:.8rem;">
+                        Simulates drawing 100 samples and computing a CI for each. Green intervals capture the
+                        true mean (μ = <span x-text="ci.simMu"></span>); red intervals miss it.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <button type="button" class="btn btn-sm btn-primary"
+                                @@click="ciRunSimulation()">Generate 100 Intervals</button>
+                        <span class="text-muted align-self-center" style="font-size:.8rem;"
+                              x-show="ci.simRun">
+                            <span x-text="ci.simCapture"></span>/100 captured μ
+                            (<span x-text="ci.simPct"></span>%)
+                        </span>
+                    </div>
+                    <div x-show="ci.simRun" style="position:relative;height:350px;">
+                        <canvas id="ciSimChart"></canvas>
+                    </div>
+                    <div x-show="!ci.simRun" class="text-center text-muted py-4" style="font-size:.85rem;">
+                        Click "Generate 100 Intervals" to see the demo.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 5 — Non-Parametric Methods
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'nonparametric'" x-transition>
+        <div class="row g-4">
+            <!-- ─── Left Column: Decision Flowchart + Sign Test ─── -->
+            <div class="col-lg-6">
+                <!-- Decision Flowchart -->
+                <div class="calc-container">
+                    <h2 class="calc-title">🔀 Non-Parametric Methods</h2>
+                    <p class="text-muted mb-3" style="font-size:.85rem;">
+                        Distribution-free alternatives when normality assumptions don't hold.
+                    </p>
+                    <h6 class="fw-semibold mb-2">When to Use?</h6>
+                    <svg viewBox="0 0 480 320" style="width:100%;max-width:480px;height:auto;" class="mb-3">
+                        <!-- Start -->
+                        <rect x="140" y="10" width="200" height="40" rx="20" fill="var(--tc-primary)" opacity="0.15" stroke="var(--tc-primary)" stroke-width="1.5"/>
+                        <text x="240" y="35" text-anchor="middle" fill="var(--tc-primary)" font-size="13" font-weight="bold">Is your data normal?</text>
+                        <!-- Yes branch -->
+                        <line x1="190" y1="50" x2="120" y2="90" stroke="#198754" stroke-width="1.5" marker-end="url(#arrowG)"/>
+                        <text x="140" y="75" fill="#198754" font-size="11" font-weight="bold">Yes</text>
+                        <rect x="20" y="90" width="200" height="36" rx="6" fill="rgba(25,135,84,.1)" stroke="#198754" stroke-width="1"/>
+                        <text x="120" y="113" text-anchor="middle" fill="#198754" font-size="12">Use parametric tests</text>
+                        <text x="120" y="145" text-anchor="middle" fill="var(--tc-text-muted)" font-size="11">(t-test, ANOVA, etc.)</text>
+                        <!-- No branch -->
+                        <line x1="290" y1="50" x2="360" y2="90" stroke="#dc3545" stroke-width="1.5" marker-end="url(#arrowR)"/>
+                        <text x="340" y="75" fill="#dc3545" font-size="11" font-weight="bold">No</text>
+                        <rect x="260" y="90" width="200" height="36" rx="6" fill="rgba(220,53,69,.1)" stroke="#dc3545" stroke-width="1"/>
+                        <text x="360" y="113" text-anchor="middle" fill="#dc3545" font-size="12">Use non-parametric tests</text>
+                        <!-- Non-parametric options -->
+                        <line x1="320" y1="126" x2="280" y2="170" stroke="var(--tc-border)" stroke-width="1"/>
+                        <line x1="400" y1="126" x2="400" y2="170" stroke="var(--tc-border)" stroke-width="1"/>
+                        <rect x="180" y="170" width="180" height="32" rx="4" fill="var(--tc-bg-offset)" stroke="var(--tc-border)" stroke-width="1"/>
+                        <text x="270" y="191" text-anchor="middle" font-size="11" fill="currentColor">Sign Test / Wilcoxon</text>
+                        <rect x="310" y="170" width="180" height="32" rx="4" fill="var(--tc-bg-offset)" stroke="var(--tc-border)" stroke-width="1"/>
+                        <text x="400" y="191" text-anchor="middle" font-size="11" fill="currentColor">Kruskal-Wallis / Mann-Whitney</text>
+                        <!-- Arrows defs -->
+                        <defs>
+                            <marker id="arrowG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#198754"/></marker>
+                            <marker id="arrowR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545"/></marker>
+                        </defs>
+                        <!-- Also consider -->
+                        <text x="240" y="240" text-anchor="middle" font-size="12" font-weight="bold" fill="currentColor">Also consider:</text>
+                        <text x="240" y="260" text-anchor="middle" font-size="11" fill="var(--tc-text-muted)">• Small sample size (n &lt; 30)</text>
+                        <text x="240" y="278" text-anchor="middle" font-size="11" fill="var(--tc-text-muted)">• Ordinal or ranked data</text>
+                        <text x="240" y="296" text-anchor="middle" font-size="11" fill="var(--tc-text-muted)">• Presence of outliers</text>
+                    </svg>
+                </div>
+
+                <!-- Sign Test Calculator -->
+                <div class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">✏️ Sign Test Calculator</h6>
+                    <p class="text-muted mb-2" style="font-size:.85rem;">
+                        Tests whether the median of paired differences is zero.
+                        Enter paired differences (positive or negative values).
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label small">Paired Differences</label>
+                        <textarea class="form-control form-control-sm" rows="2"
+                                  x-model="np.signTestData"
+                                  placeholder="e.g.: 2.1, -0.5, 1.3, 0.8, -1.2, 0.4, 1.1, -0.3"
+                                  style="font-size:.85rem;"></textarea>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm mb-3"
+                            @@click="npSignTest()">Run Sign Test</button>
+
+                    <div x-show="np.signResult" x-transition>
+                        <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                            <div class="prob-result-item">
+                                <div class="prob-result-label">Positive</div>
+                                <div class="prob-result-value" x-text="np.signPos"></div>
+                            </div>
+                            <div class="prob-result-item">
+                                <div class="prob-result-label">Negative</div>
+                                <div class="prob-result-value" x-text="np.signNeg"></div>
+                            </div>
+                            <div class="prob-result-item">
+                                <div class="prob-result-label">Test Stat (S)</div>
+                                <div class="prob-result-value" x-text="np.signStat"></div>
+                            </div>
+                            <div class="prob-result-item">
+                                <div class="prob-result-label">P-Value (approx)</div>
+                                <div class="prob-result-value" x-text="np.signPValue"></div>
+                            </div>
+                        </div>
+                        <div class="mt-2 p-2 rounded text-center fw-semibold" style="font-size:.85rem;"
+                             :style="np.signReject ? 'background:rgba(220,53,69,.12);color:#dc3545;border:1px solid rgba(220,53,69,.3);' : 'background:rgba(25,135,84,.12);color:#198754;border:1px solid rgba(25,135,84,.3);'">
+                            <span x-show="np.signReject">✗ Reject H₀ (median ≠ 0) at α = 0.05</span>
+                            <span x-show="!np.signReject">✓ Fail to reject H₀ (median = 0) at α = 0.05</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Right Column: Wilcoxon + Comparison ─── -->
+            <div class="col-lg-6">
+                <!-- Wilcoxon Rank-Sum Worked Example -->
+                <div class="calc-container">
+                    <h6 class="fw-semibold mb-2">📖 Wilcoxon Rank-Sum — Worked Example</h6>
+                    <p class="text-muted mb-2" style="font-size:.85rem;">
+                        Comparing two independent groups without assuming normality.
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" style="font-size:.85rem;">
+                            <thead>
+                                <tr><th>Value</th><th>Group</th><th>Rank</th></tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(r, i) in np.wilcoxonRows" :key="i">
+                                    <tr :style="r.group === 'A' ? 'background:rgba(13,110,253,.06);' : ''">
+                                        <td x-text="r.value"></td>
+                                        <td><span class="badge" :class="r.group === 'A' ? 'bg-primary' : 'bg-secondary'" x-text="r.group"></span></td>
+                                        <td x-text="r.rank"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="prob-result-grid mt-2" style="grid-template-columns:1fr 1fr;">
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">W (sum of ranks, Group A)</div>
+                            <div class="prob-result-value" x-text="np.wilcoxonW"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">Interpretation</div>
+                            <div class="prob-result-value" style="font-size:.8rem;" x-text="np.wilcoxonInterp"></div>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-muted" style="font-size:.8rem;">
+                        <strong>Steps:</strong>
+                        (1) Combine and sort all values;
+                        (2) Assign ranks 1, 2, …, N;
+                        (3) Sum ranks for one group (W);
+                        (4) Compare W to expected value under H₀.
+                    </div>
+                </div>
+
+                <!-- Comparison Table -->
+                <div class="calc-container mt-3">
+                    <h6 class="fw-semibold mb-2">Parametric vs Non-Parametric</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" style="font-size:.85rem;">
+                            <thead>
+                                <tr>
+                                    <th>Parametric Test</th>
+                                    <th>Non-Parametric Equivalent</th>
+                                    <th>Use When…</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>One-sample t-test</td>
+                                    <td><strong>Wilcoxon Signed-Rank</strong></td>
+                                    <td>Non-normal, one group</td>
+                                </tr>
+                                <tr>
+                                    <td>Paired t-test</td>
+                                    <td><strong>Sign Test</strong></td>
+                                    <td>Paired data, ordinal/skewed</td>
+                                </tr>
+                                <tr>
+                                    <td>Two-sample t-test</td>
+                                    <td><strong>Mann-Whitney U</strong></td>
+                                    <td>Two independent groups</td>
+                                </tr>
+                                <tr>
+                                    <td>One-way ANOVA</td>
+                                    <td><strong>Kruskal-Wallis</strong></td>
+                                    <td>3+ groups, non-normal</td>
+                                </tr>
+                                <tr>
+                                    <td>Pearson correlation</td>
+                                    <td><strong>Spearman's ρ</strong></td>
+                                    <td>Non-linear, ordinal data</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Teaching Callout -->
+                <div class="calc-container mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-info w-100"
+                            data-bs-toggle="collapse" data-bs-target="#npLearn">
+                        💡 Learn — Why Non-Parametric?
+                    </button>
+                    <div class="collapse mt-3" id="npLearn">
+                        <div class="prob-teach-card">
+                            <p class="mb-2"><strong>Non-parametric tests make fewer assumptions about your data distribution.</strong></p>
+                            <ul class="mb-2" style="font-size:.85rem;">
+                                <li>They work on <strong>ranks</strong> rather than raw values, making them resistant to outliers</li>
+                                <li>Valid for <strong>ordinal data</strong> (e.g., survey scales) where parametric tests aren't appropriate</li>
+                                <li>Trade-off: slightly less statistical power when the normality assumption actually holds</li>
+                            </ul>
+                            <p class="mb-0" style="font-size:.85rem;">
+                                <strong>Rule of thumb:</strong> If your sample is small (n &lt; 30) and you can't verify normality,
+                                non-parametric methods are the safer choice.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Quick Reference ─── -->
+    <div class="calc-container mt-4">
+        <h2 class="calc-title">📋 Quick Reference</h2>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Bayes' Theorem</div>
+                    <div class="prob-ref-formula">P(H|D) ∝ P(D|H) · P(H)</div>
+                    <div class="prob-ref-note">Posterior ∝ Likelihood × Prior</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Hypothesis Testing</div>
+                    <div class="prob-ref-formula">Reject H₀ if p-value &lt; α</div>
+                    <div class="prob-ref-note">Small p-value → data unlikely under H₀</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Confidence Interval</div>
+                    <div class="prob-ref-formula">x̄ ± z* · σ/√n</div>
+                    <div class="prob-ref-note">~95% of intervals capture the true mean</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Maximum Likelihood</div>
+                    <div class="prob-ref-formula">θ̂ = argmax L(θ|data)</div>
+                    <div class="prob-ref-note">Find parameters making observed data most probable</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Z-Test Statistic</div>
+                    <div class="prob-ref-formula">z = (x̄ − μ₀) / (σ/√n)</div>
+                    <div class="prob-ref-note">Known population σ, large sample</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">T-Test Statistic</div>
+                    <div class="prob-ref-formula">t = (x̄ − μ₀) / (s/√n)</div>
+                    <div class="prob-ref-note">Unknown σ, uses sample std dev s</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Cross-page Navigation ─── -->
+    <div class="d-flex justify-content-between mt-4 pt-3" style="border-top:1px solid var(--tc-border);">
+        <a asp-page="/Simulation" class="btn btn-outline-secondary">← Simulation</a>
+        <a asp-page="/Probability" class="btn btn-outline-primary">Probability Rules →</a>
+    </div>
+</div>
+
+<script>
+function inferenceApp() {
+    return {
+        tab: 'bayesian',
+
+        // ═══════════════════════════════════════════════
+        // Bayesian Updater State
+        // ═══════════════════════════════════════════════
+        bay: {
+            priorPreset: 'uniform',
+            alpha: 1, beta: 1,
+            successes: 6, trials: 10,
+            loading: false, hasResult: false,
+            postAlpha: '', postBeta: '', postMean: '',
+            credLower: '', credUpper: '',
+            round: 0,
+            history: [],
+            // store original prior for reset
+            origAlpha: 1, origBeta: 1,
+        },
+        bayChart: null,
+
+        // ═══════════════════════════════════════════════
+        // Hypothesis Testing State
+        // ═══════════════════════════════════════════════
+        ht: {
+            testType: 'z',
+            sampleMean: 105, popMean: 100, stdDev: 15, sampleSize: 30,
+            alpha: '0.05', alternative: 'two-tailed',
+            // chi-square
+            categories: [
+                { obs: 18, exp: 16.67 }, { obs: 22, exp: 16.67 },
+                { obs: 8, exp: 16.67 }, { obs: 20, exp: 16.67 },
+                { obs: 14, exp: 16.67 }, { obs: 18, exp: 16.67 },
+            ],
+            loading: false, hasResult: false,
+            testStat: '', pValue: '', criticalValue: '',
+            reject: false, alphaUsed: '', altDisplay: '', altSymbol: '',
+            df: '',
+            // error visualizer
+            effectSize: 1.5,
+            power: '—', betaError: '—',
+            // chart data (stored for error visualizer)
+            curveData: null,
+        },
+        htChart: null,
+        errorChart: null,
+
+        init() {
+            this.$watch('tab', (val) => {
+                this.$nextTick(() => {
+                    if (val === 'bayesian' && this.bay.hasResult) this.bayDrawChart();
+                    if (val === 'hypothesis' && this.ht.hasResult && this.ht.testType !== 'chi2') this.htDrawChart();
+                    if (val === 'mle' && this.mle.hasResult) {
+                        if (this.mle.distType === 'normal') { this.mleDrawHistogram(); this.mleDrawContour(); }
+                        else this.mleDrawBinomialChart();
+                    }
+                    if (val === 'confidence' && this.ci.hasResult) this.ciDrawNumberLine();
+                });
+            });
+        },
+
+        // ═══════════════════════════════════════════════
+        // Bayesian: Preset Management
+        // ═══════════════════════════════════════════════
+        baySetPreset(name) {
+            this.bay.priorPreset = name;
+            const presets = {
+                uniform:  { a: 1,  b: 1  },
+                neutral:  { a: 2,  b: 2  },
+                believer: { a: 10, b: 2  },
+                skeptic:  { a: 2,  b: 10 },
+            };
+            if (presets[name]) {
+                this.bay.alpha = presets[name].a;
+                this.bay.beta = presets[name].b;
+            }
+        },
+
+        bayLoadExample(name) {
+            this.bayReset();
+            if (name === 'coin') {
+                this.baySetPreset('uniform');
+                this.bay.successes = 6; this.bay.trials = 10;
+            } else if (name === 'drug') {
+                this.baySetPreset('neutral');
+                this.bay.successes = 45; this.bay.trials = 50;
+            } else if (name === 'rare') {
+                this.baySetPreset('skeptic');
+                this.bay.successes = 2; this.bay.trials = 1000;
+            }
+            this.$nextTick(() => this.bayUpdate());
+        },
+
+        // ═══════════════════════════════════════════════
+        // Bayesian: Update
+        // ═══════════════════════════════════════════════
+        async bayUpdate() {
+            if (this.bay.alpha <= 0 || this.bay.beta <= 0 || this.bay.trials < 1 ||
+                this.bay.successes < 0 || this.bay.successes > this.bay.trials) return;
+
+            this.bay.loading = true;
+            if (this.bay.round === 0) {
+                this.bay.origAlpha = this.bay.alpha;
+                this.bay.origBeta = this.bay.beta;
+            }
+
+            const form = document.getElementById('bayesianForm');
+            const fd = new FormData(form);
+            fd.set('priorAlpha', this.bay.alpha);
+            fd.set('priorBeta', this.bay.beta);
+            fd.set('successes', this.bay.successes);
+            fd.set('trials', this.bay.trials);
+
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+
+                this.bay.postAlpha = data.posteriorAlpha;
+                this.bay.postBeta = data.posteriorBeta;
+                this.bay.postMean = data.posteriorMean.toFixed(4);
+                this.bay.credLower = data.credibleLower.toFixed(4);
+                this.bay.credUpper = data.credibleUpper.toFixed(4);
+                this.bay.round++;
+                this.bay.hasResult = true;
+
+                this.bay.history.push({
+                    priorA: this.bay.alpha,
+                    priorB: this.bay.beta,
+                    k: this.bay.successes,
+                    n: this.bay.trials,
+                    postA: data.posteriorAlpha,
+                    postB: data.posteriorBeta,
+                    mean: data.posteriorMean.toFixed(4),
+                });
+
+                // store curves for chart
+                this.bay._prior = data.priorCurve;
+                this.bay._likelihood = data.likelihoodCurve;
+                this.bay._posterior = data.posteriorCurve;
+
+                this.$nextTick(() => this.bayDrawChart());
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                this.bay.loading = false;
+            }
+        },
+
+        baySequentialUpdate() {
+            // use current posterior as the new prior
+            this.bay.alpha = this.bay.postAlpha;
+            this.bay.beta = this.bay.postBeta;
+            this.bay.priorPreset = 'custom';
+            this.bayUpdate();
+        },
+
+        bayReset() {
+            this.bay.priorPreset = 'uniform';
+            this.bay.alpha = 1; this.bay.beta = 1;
+            this.bay.successes = 6; this.bay.trials = 10;
+            this.bay.hasResult = false;
+            this.bay.round = 0;
+            this.bay.history = [];
+            this.bay.postAlpha = ''; this.bay.postBeta = '';
+            this.bay.postMean = ''; this.bay.credLower = ''; this.bay.credUpper = '';
+            if (this.bayChart) { this.bayChart.destroy(); this.bayChart = null; }
+        },
+
+        // ═══════════════════════════════════════════════
+        // Bayesian: Chart
+        // ═══════════════════════════════════════════════
+        bayDrawChart() {
+            const ctx = document.getElementById('bayesianChart');
+            if (!ctx) return;
+            if (this.bayChart) this.bayChart.destroy();
+
+            const prior = this.bay._prior || [];
+            const likelihood = this.bay._likelihood || [];
+            const posterior = this.bay._posterior || [];
+
+            const labels = posterior.map(p => p.x.toFixed(3));
+
+            this.bayChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Prior',
+                            data: prior.map(p => p.y),
+                            borderColor: '#6c757d',
+                            borderDash: [6, 4],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'Likelihood',
+                            data: likelihood.map(p => p.y),
+                            borderColor: '#ffc107',
+                            borderDash: [3, 3],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'Posterior',
+                            data: posterior.map(p => p.y),
+                            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            fill: true,
+                            backgroundColor: 'rgba(13, 110, 253, 0.08)',
+                            tension: 0.3,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => 'θ = ' + items[0].label,
+                                label: (item) => item.dataset.label + ': ' + Number(item.raw).toFixed(4),
+                            }
+                        },
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'θ (probability)' },
+                            ticks: {
+                                maxTicksLimit: 11,
+                                callback: function(val, i) {
+                                    const v = parseFloat(this.getLabelForValue(val));
+                                    return (v * 100) % 10 === 0 ? v.toFixed(1) : '';
+                                }
+                            },
+                        },
+                        y: {
+                            title: { display: true, text: 'Density' },
+                            beginAtZero: true,
+                        },
+                    },
+                },
+            });
+        },
+
+        // ═══════════════════════════════════════════════
+        // Hypothesis Testing: State Management
+        // ═══════════════════════════════════════════════
+        htSetTestType(type) {
+            this.ht.testType = type;
+            this.ht.hasResult = false;
+            if (this.htChart) { this.htChart.destroy(); this.htChart = null; }
+        },
+
+        htAddCategory() {
+            if (this.ht.categories.length < 10) {
+                this.ht.categories.push({ obs: 10, exp: 10 });
+            }
+        },
+
+        htRemoveCategory() {
+            if (this.ht.categories.length > 2) {
+                this.ht.categories.pop();
+            }
+        },
+
+        htLoadExample(name) {
+            this.htReset();
+            if (name === 'mean') {
+                this.ht.testType = 'z';
+                this.ht.sampleMean = 105; this.ht.popMean = 100;
+                this.ht.stdDev = 15; this.ht.sampleSize = 30;
+                this.ht.alpha = '0.05'; this.ht.alternative = 'two-tailed';
+            } else if (name === 'small') {
+                this.ht.testType = 't';
+                this.ht.sampleMean = 82; this.ht.popMean = 75;
+                this.ht.stdDev = 12; this.ht.sampleSize = 8;
+                this.ht.alpha = '0.05'; this.ht.alternative = 'right';
+            } else if (name === 'dice') {
+                this.ht.testType = 'chi2';
+                this.ht.categories = [
+                    { obs: 18, exp: 16.67 }, { obs: 22, exp: 16.67 },
+                    { obs: 8, exp: 16.67 }, { obs: 20, exp: 16.67 },
+                    { obs: 14, exp: 16.67 }, { obs: 18, exp: 16.67 },
+                ];
+                this.ht.alpha = '0.05';
+            }
+            this.$nextTick(() => this.htRunTest());
+        },
+
+        htReset() {
+            this.ht.hasResult = false;
+            this.ht.testStat = ''; this.ht.pValue = '';
+            this.ht.criticalValue = ''; this.ht.reject = false;
+            this.ht.altDisplay = ''; this.ht.altSymbol = '';
+            this.ht.df = ''; this.ht.curveData = null;
+            this.ht.power = '—'; this.ht.betaError = '—';
+            if (this.htChart) { this.htChart.destroy(); this.htChart = null; }
+            if (this.errorChart) { this.errorChart.destroy(); this.errorChart = null; }
+        },
+
+        // ═══════════════════════════════════════════════
+        // Hypothesis Testing: Run
+        // ═══════════════════════════════════════════════
+        async htRunTest() {
+            this.ht.loading = true;
+            try {
+                let data;
+                const alpha = parseFloat(this.ht.alpha);
+
+                if (this.ht.testType === 'z') {
+                    const form = document.getElementById('zTestForm');
+                    const fd = new FormData(form);
+                    fd.set('sampleMean', this.ht.sampleMean);
+                    fd.set('populationMean', this.ht.popMean);
+                    fd.set('populationStdDev', this.ht.stdDev);
+                    fd.set('sampleSize', this.ht.sampleSize);
+                    fd.set('alpha', alpha);
+                    fd.set('alternative', this.ht.alternative);
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    data = await resp.json();
+                } else if (this.ht.testType === 't') {
+                    const form = document.getElementById('tTestForm');
+                    const fd = new FormData(form);
+                    fd.set('sampleMean', this.ht.sampleMean);
+                    fd.set('populationMean', this.ht.popMean);
+                    fd.set('sampleStdDev', this.ht.stdDev);
+                    fd.set('sampleSize', this.ht.sampleSize);
+                    fd.set('alpha', alpha);
+                    fd.set('alternative', this.ht.alternative);
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    data = await resp.json();
+                } else {
+                    const form = document.getElementById('chiSquareForm');
+                    const fd = new FormData(form);
+                    fd.set('observedJson', JSON.stringify(this.ht.categories.map(c => c.obs)));
+                    fd.set('expectedJson', JSON.stringify(this.ht.categories.map(c => c.exp)));
+                    fd.set('alpha', alpha);
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    data = await resp.json();
+                }
+
+                if (data.error) { alert(data.error); return; }
+
+                this.ht.testStat = data.testStatistic.toFixed(4);
+                this.ht.pValue = data.pValue < 0.0001 ? data.pValue.toExponential(4) : data.pValue.toFixed(4);
+                this.ht.criticalValue = data.criticalValue.toFixed(4);
+                this.ht.reject = data.rejectNull;
+                this.ht.alphaUsed = alpha;
+                this.ht.df = data.degreesOfFreedom || '';
+
+                const altMap = { 'two-tailed': 'μ ≠ μ₀', 'left': 'μ < μ₀', 'right': 'μ > μ₀' };
+                const symMap = { 'two-tailed': '≠', 'left': '<', 'right': '>' };
+                this.ht.altDisplay = altMap[data.alternative] || data.alternative || '';
+                this.ht.altSymbol = symMap[data.alternative] || '≠';
+
+                this.ht.curveData = data.distributionCurve || null;
+                this.ht.hasResult = true;
+
+                this.$nextTick(() => {
+                    if (this.ht.testType !== 'chi2') {
+                        this.htDrawChart();
+                        this.htDrawErrorChart();
+                    }
+                });
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                this.ht.loading = false;
+            }
+        },
+
+        // ═══════════════════════════════════════════════
+        // Hypothesis Testing: Distribution Chart
+        // ═══════════════════════════════════════════════
+        htDrawChart() {
+            const ctx = document.getElementById('hypothesisChart');
+            if (!ctx || !this.ht.curveData) return;
+            if (this.htChart) this.htChart.destroy();
+
+            const curve = this.ht.curveData;
+            const labels = curve.map(p => p.x.toFixed(3));
+            const values = curve.map(p => p.y);
+            const testStat = parseFloat(this.ht.testStat);
+            const critVal = parseFloat(this.ht.criticalValue);
+            const alt = this.ht.alternative || this.ht.altDisplay;
+            const isTwoTailed = alt === 'two-tailed' || alt === 'μ ≠ μ₀';
+            const isLeft = alt === 'left' || alt === 'μ < μ₀';
+
+            // build rejection region shading
+            const rejectionBg = curve.map(p => {
+                if (isTwoTailed) {
+                    return (p.x <= -critVal || p.x >= critVal) ? p.y : null;
+                } else if (isLeft) {
+                    return p.x <= -critVal ? p.y : null;
+                } else {
+                    return p.x >= critVal ? p.y : null;
+                }
+            });
+
+            const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+
+            this.htChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Distribution',
+                            data: values,
+                            borderColor: primary,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'Rejection Region',
+                            data: rejectionBg,
+                            borderColor: 'transparent',
+                            borderWidth: 0,
+                            pointRadius: 0,
+                            fill: true,
+                            backgroundColor: 'rgba(220, 53, 69, 0.25)',
+                            tension: 0.3,
+                            spanGaps: false,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => 'x = ' + items[0].label,
+                                label: (item) => {
+                                    if (item.datasetIndex === 1) return null;
+                                    return 'f(x) = ' + Number(item.raw).toFixed(4);
+                                },
+                            },
+                            filter: (item) => item.datasetIndex === 0,
+                        },
+                        annotation: this._htAnnotations(testStat, critVal, isTwoTailed, isLeft),
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: this.ht.testType === 'z' ? 'z' : 't' },
+                            ticks: { maxTicksLimit: 11 },
+                        },
+                        y: {
+                            title: { display: true, text: 'Density' },
+                            beginAtZero: true,
+                        },
+                    },
+                },
+                plugins: [this._htVerticalLinePlugin()],
+            });
+        },
+
+        // annotation config for critical value and test statistic lines
+        _htAnnotations(testStat, critVal, isTwoTailed, isLeft) {
+            // We use a custom plugin instead since annotation plugin may not be available
+            return {};
+        },
+
+        // custom plugin to draw vertical lines for test stat and critical values
+        _htVerticalLinePlugin() {
+            const self = this;
+            return {
+                id: 'htVerticalLines',
+                afterDraw(chart) {
+                    if (!self.ht.hasResult || self.ht.testType === 'chi2') return;
+                    const { ctx: c, chartArea: { left, right, top, bottom }, scales: { x, y } } = chart;
+                    const curve = self.ht.curveData;
+                    if (!curve || curve.length === 0) return;
+
+                    const testStat = parseFloat(self.ht.testStat);
+                    const critVal = parseFloat(self.ht.criticalValue);
+                    const alt = self.ht.alternative || '';
+                    const isTwoTailed = alt === 'two-tailed';
+                    const isLeft = alt === 'left';
+
+                    const xMin = curve[0].x;
+                    const xMax = curve[curve.length - 1].x;
+                    const xRange = xMax - xMin;
+
+                    function valToPixel(val) {
+                        const ratio = (val - xMin) / xRange;
+                        return left + ratio * (right - left);
+                    }
+
+                    function drawLine(xVal, color, label, dashPattern) {
+                        if (xVal < xMin || xVal > xMax) return;
+                        const px = valToPixel(xVal);
+                        c.save();
+                        c.beginPath();
+                        c.setLineDash(dashPattern || []);
+                        c.strokeStyle = color;
+                        c.lineWidth = 2;
+                        c.moveTo(px, top);
+                        c.lineTo(px, bottom);
+                        c.stroke();
+                        // label
+                        c.fillStyle = color;
+                        c.font = 'bold 11px sans-serif';
+                        c.textAlign = 'center';
+                        c.fillText(label, px, top - 5);
+                        c.restore();
+                    }
+
+                    // test statistic line
+                    drawLine(testStat, '#dc3545', self.ht.testType === 'z' ? 'z=' + testStat.toFixed(2) : 't=' + testStat.toFixed(2), []);
+
+                    // critical value lines
+                    if (isTwoTailed) {
+                        drawLine(critVal, '#6c757d', 'cv=' + critVal.toFixed(2), [5, 3]);
+                        drawLine(-critVal, '#6c757d', 'cv=' + (-critVal).toFixed(2), [5, 3]);
+                    } else if (isLeft) {
+                        drawLine(-critVal, '#6c757d', 'cv=' + (-critVal).toFixed(2), [5, 3]);
+                    } else {
+                        drawLine(critVal, '#6c757d', 'cv=' + critVal.toFixed(2), [5, 3]);
+                    }
+                }
+            };
+        },
+
+        // ═══════════════════════════════════════════════
+        // Hypothesis Testing: Type I/II Error Chart
+        // ═══════════════════════════════════════════════
+        htDrawErrorChart() {
+            const ctx = document.getElementById('errorChart');
+            if (!ctx) return;
+            if (this.errorChart) this.errorChart.destroy();
+
+            const alpha = parseFloat(this.ht.alpha);
+            const alt = this.ht.alternative || 'two-tailed';
+            const isTwoTailed = alt === 'two-tailed';
+            const isLeft = alt === 'left';
+            const delta = this.ht.effectSize;
+
+            // generate standard normal curves for H0 and Ha
+            const n = 200;
+            const range = 6;
+            const step = (2 * range) / n;
+            const h0Points = [];
+            const haPoints = [];
+
+            for (let i = 0; i <= n; i++) {
+                const x = -range + i * step;
+                const h0y = Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+                const haX = x - delta;
+                const hay = Math.exp(-0.5 * haX * haX) / Math.sqrt(2 * Math.PI);
+                h0Points.push({ x, h0y, hay });
+            }
+
+            // critical value for standard normal
+            let zCrit;
+            if (isTwoTailed) {
+                zCrit = this._normalQuantile(1 - alpha / 2);
+            } else {
+                zCrit = this._normalQuantile(1 - alpha);
+            }
+
+            // compute power
+            let power;
+            if (isTwoTailed) {
+                const pRight = 1 - this._normalCdf(zCrit - delta);
+                const pLeft = this._normalCdf(-zCrit - delta);
+                power = pRight + pLeft;
+            } else if (isLeft) {
+                power = this._normalCdf(-zCrit - delta);
+            } else {
+                power = 1 - this._normalCdf(zCrit - delta);
+            }
+            power = Math.max(0, Math.min(1, power));
+            this.ht.power = power.toFixed(4);
+            this.ht.betaError = (1 - power).toFixed(4);
+
+            const labels = h0Points.map(p => p.x.toFixed(3));
+
+            // alpha region (under H0)
+            const alphaRegion = h0Points.map(p => {
+                if (isTwoTailed) return (p.x <= -zCrit || p.x >= zCrit) ? p.h0y : null;
+                if (isLeft) return p.x <= -zCrit ? p.h0y : null;
+                return p.x >= zCrit ? p.h0y : null;
+            });
+
+            // beta region (under Ha, where we fail to reject)
+            const betaRegion = h0Points.map(p => {
+                if (isTwoTailed) return (p.x > -zCrit && p.x < zCrit) ? p.hay : null;
+                if (isLeft) return p.x > -zCrit ? p.hay : null;
+                return p.x < zCrit ? p.hay : null;
+            });
+
+            const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+
+            this.errorChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'H₀ Distribution',
+                            data: h0Points.map(p => p.h0y),
+                            borderColor: primary,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'Hₐ Distribution',
+                            data: h0Points.map(p => p.hay),
+                            borderColor: '#198754',
+                            borderWidth: 2,
+                            borderDash: [5, 3],
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3,
+                        },
+                        {
+                            label: 'α (Type I)',
+                            data: alphaRegion,
+                            borderColor: 'transparent',
+                            pointRadius: 0,
+                            fill: true,
+                            backgroundColor: 'rgba(220, 53, 69, 0.25)',
+                            tension: 0.3,
+                            spanGaps: false,
+                        },
+                        {
+                            label: 'β (Type II)',
+                            data: betaRegion,
+                            borderColor: 'transparent',
+                            pointRadius: 0,
+                            fill: true,
+                            backgroundColor: 'rgba(255, 193, 7, 0.25)',
+                            tension: 0.3,
+                            spanGaps: false,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false },
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 9 },
+                            title: { display: true, text: 'z' },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Density' },
+                        },
+                    },
+                },
+            });
+        },
+
+        // ── Standard Normal helpers for client-side power computation ──
+        _normalCdf(x) {
+            const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+            const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+            const sign = x < 0 ? -1 : 1;
+            x = Math.abs(x) / Math.sqrt(2);
+            const t = 1 / (1 + p * x);
+            const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+            return 0.5 * (1 + sign * y);
+        },
+
+        _normalQuantile(p) {
+            // Rational approximation (Abramowitz & Stegun)
+            if (p <= 0) return -Infinity;
+            if (p >= 1) return Infinity;
+            if (p === 0.5) return 0;
+            const sign = p < 0.5 ? -1 : 1;
+            const pp = p < 0.5 ? p : 1 - p;
+            const t = Math.sqrt(-2 * Math.log(pp));
+            const c0 = 2.515517, c1 = 0.802853, c2 = 0.010328;
+            const d1 = 1.432788, d2 = 0.189269, d3 = 0.001308;
+            return sign * (t - (c0 + c1 * t + c2 * t * t) / (1 + d1 * t + d2 * t * t + d3 * t * t * t));
+        },
+
+        // ═══════════════════════════════════════════════
+        // MLE State
+        // ═══════════════════════════════════════════════
+        mle: {
+            distType: 'normal',
+            dataText: '65.2, 68.1, 63.8, 67.5, 70.3, 64.9, 66.7, 69.0, 62.1, 67.8, 71.2, 65.5, 68.4, 66.0, 69.5',
+            binTrials: 100, binSuccesses: 60,
+            loading: false, hasResult: false,
+            estMean: '', estSigma: '', estP: '', logLik: '',
+            _contour: null, _muAxis: null, _sigmaAxis: null,
+            _llCurve: null, _dataValues: null,
+        },
+        mleHistChart: null,
+        mleBinChart: null,
+        mleContourChart: null,
+
+        // ═══════════════════════════════════════════════
+        // Confidence Interval State
+        // ═══════════════════════════════════════════════
+        ci: {
+            sampleMean: 98.5, stdDev: 12.3, sampleSize: 25,
+            confLevel: '0.95', isPopStdDev: false,
+            loading: false, hasResult: false,
+            lower: '', upper: '', moe: '', critVal: '', intervalType: '',
+            // simulation
+            simMu: 100, simRun: false, simCapture: 0, simPct: '',
+            simIntervals: [],
+        },
+        ciNumberLineChart: null,
+        ciSimChart: null,
+
+        // ═══════════════════════════════════════════════
+        // Non-Parametric State
+        // ═══════════════════════════════════════════════
+        np: {
+            signTestData: '2.1, -0.5, 1.3, 0.8, -1.2, 0.4, 1.1, -0.3',
+            signResult: false,
+            signPos: 0, signNeg: 0, signStat: 0,
+            signPValue: '', signReject: false,
+            // Wilcoxon worked example
+            wilcoxonRows: [
+                { value: 3.2, group: 'A', rank: 1 },
+                { value: 4.1, group: 'B', rank: 2 },
+                { value: 4.5, group: 'A', rank: 3 },
+                { value: 5.0, group: 'B', rank: 4 },
+                { value: 5.3, group: 'A', rank: 5 },
+                { value: 5.8, group: 'B', rank: 6 },
+                { value: 6.1, group: 'A', rank: 7 },
+                { value: 7.2, group: 'B', rank: 8 },
+            ],
+            wilcoxonW: '1+3+5+7 = 16',
+            wilcoxonInterp: 'W=16, expected=18 under H₀ — no significant difference',
+        },
+
+        // ═══════════════════════════════════════════════
+        // MLE: Presets
+        // ═══════════════════════════════════════════════
+        mleLoadPreset(name) {
+            this.mleReset();
+            if (name === 'heights') {
+                this.mle.distType = 'normal';
+                this.mle.dataText = '65.2, 68.1, 63.8, 67.5, 70.3, 64.9, 66.7, 69.0, 62.1, 67.8, 71.2, 65.5, 68.4, 66.0, 69.5';
+            } else if (name === 'scores') {
+                this.mle.distType = 'normal';
+                this.mle.dataText = '78, 82, 91, 85, 73, 88, 79, 95, 84, 76, 90, 87, 81, 93, 86, 72, 89, 83, 77, 94';
+            } else if (name === 'temps') {
+                this.mle.distType = 'normal';
+                this.mle.dataText = '22.1, 23.5, 21.8, 24.2, 22.9, 23.1, 21.5, 24.8, 23.7, 22.4, 23.0, 24.1, 22.6, 23.3, 21.9';
+            } else if (name === 'coin') {
+                this.mle.distType = 'binomial';
+                this.mle.binTrials = 100; this.mle.binSuccesses = 60;
+            } else if (name === 'defects') {
+                this.mle.distType = 'binomial';
+                this.mle.binTrials = 50; this.mle.binSuccesses = 3;
+            }
+            this.$nextTick(() => this.mleCompute());
+        },
+
+        mleReset() {
+            this.mle.hasResult = false;
+            this.mle.estMean = ''; this.mle.estSigma = ''; this.mle.estP = ''; this.mle.logLik = '';
+            this.mle._contour = null; this.mle._llCurve = null; this.mle._dataValues = null;
+            if (this.mleHistChart) { this.mleHistChart.destroy(); this.mleHistChart = null; }
+            if (this.mleBinChart) { this.mleBinChart.destroy(); this.mleBinChart = null; }
+            if (this.mleContourChart) { this.mleContourChart.destroy(); this.mleContourChart = null; }
+        },
+
+        _mleParseData() {
+            return this.mle.dataText.split(/[,\s\n]+/).map(s => parseFloat(s.trim())).filter(v => !isNaN(v));
+        },
+
+        // ═══════════════════════════════════════════════
+        // MLE: Compute
+        // ═══════════════════════════════════════════════
+        async mleCompute() {
+            this.mle.loading = true;
+            try {
+                let data;
+                if (this.mle.distType === 'normal') {
+                    const values = this._mleParseData();
+                    if (values.length < 2) { alert('Need at least 2 data points.'); return; }
+                    this.mle._dataValues = values;
+                    const form = document.getElementById('mleNormalForm');
+                    const fd = new FormData(form);
+                    fd.set('dataJson', JSON.stringify(values));
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    data = await resp.json();
+                    if (data.error) { alert(data.error); return; }
+
+                    this.mle.estMean = data.estimatedMean.toFixed(4);
+                    this.mle.estSigma = data.estimatedStdDev.toFixed(4);
+                    this.mle.logLik = data.logLikelihood.toFixed(2);
+                    this.mle._contour = data.contourData;
+                    this.mle._muAxis = data.muAxis;
+                    this.mle._sigmaAxis = data.sigmaAxis;
+                } else {
+                    const form = document.getElementById('mleBinomialForm');
+                    const fd = new FormData(form);
+                    fd.set('trials', this.mle.binTrials);
+                    fd.set('successes', this.mle.binSuccesses);
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    data = await resp.json();
+                    if (data.error) { alert(data.error); return; }
+
+                    this.mle.estP = data.estimatedP.toFixed(4);
+                    this.mle.logLik = data.logLikelihood.toFixed(2);
+                    this.mle._llCurve = data.logLikelihoodCurve;
+                }
+
+                this.mle.hasResult = true;
+                this.$nextTick(() => {
+                    if (this.mle.distType === 'normal') {
+                        this.mleDrawHistogram();
+                        this.mleDrawContour();
+                    } else {
+                        this.mleDrawBinomialChart();
+                    }
+                });
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                this.mle.loading = false;
+            }
+        },
+
+        // ═══════════════════════════════════════════════
+        // MLE: Charts
+        // ═══════════════════════════════════════════════
+        mleDrawHistogram() {
+            const ctx = document.getElementById('mleHistogramChart');
+            if (!ctx || !this.mle._dataValues) return;
+            if (this.mleHistChart) this.mleHistChart.destroy();
+
+            const values = this.mle._dataValues;
+            const mu = parseFloat(this.mle.estMean);
+            const sigma = parseFloat(this.mle.estSigma);
+            const min = Math.min(...values) - sigma;
+            const max = Math.max(...values) + sigma;
+            const bins = 12;
+            const binWidth = (max - min) / bins;
+            const counts = new Array(bins).fill(0);
+            values.forEach(v => {
+                const idx = Math.min(Math.floor((v - min) / binWidth), bins - 1);
+                if (idx >= 0) counts[idx]++;
+            });
+            // normalize to density
+            const n = values.length;
+            const density = counts.map(c => c / (n * binWidth));
+            const binLabels = counts.map((_, i) => (min + (i + 0.5) * binWidth).toFixed(1));
+
+            // fitted normal overlay
+            const fitX = [];
+            const fitY = [];
+            for (let i = 0; i <= 60; i++) {
+                const x = min + (max - min) * i / 60;
+                fitX.push(x.toFixed(2));
+                fitY.push(Math.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * Math.sqrt(2 * Math.PI)));
+            }
+
+            const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+
+            this.mleHistChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: binLabels,
+                    datasets: [
+                        {
+                            label: 'Data (density)',
+                            data: density,
+                            backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                            borderColor: primary,
+                            borderWidth: 1,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: (item) => 'Density: ' + Number(item.raw).toFixed(4),
+                            }
+                        },
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Value' } },
+                        y: { title: { display: true, text: 'Density' }, beginAtZero: true },
+                    },
+                },
+                plugins: [{
+                    id: 'fittedOverlay',
+                    afterDraw: (chart) => {
+                        const { ctx: c2, chartArea: { left, right, top, bottom }, scales: { x, y } } = chart;
+                        c2.save();
+                        c2.strokeStyle = '#dc3545';
+                        c2.lineWidth = 2;
+                        c2.beginPath();
+                        for (let i = 0; i <= 60; i++) {
+                            const xVal = min + (max - min) * i / 60;
+                            const yVal = Math.exp(-0.5 * ((xVal - mu) / sigma) ** 2) / (sigma * Math.sqrt(2 * Math.PI));
+                            const labels = chart.data.labels;
+                            const xMin2 = parseFloat(labels[0]);
+                            const xMax2 = parseFloat(labels[labels.length - 1]);
+                            const px = left + ((xVal - (min + 0.5 * binWidth)) / ((max - binWidth * 0.5) - (min + 0.5 * binWidth))) * (right - left);
+                            const py = bottom - (yVal / y.max) * (bottom - top);
+                            if (i === 0) c2.moveTo(px, py); else c2.lineTo(px, py);
+                        }
+                        c2.stroke();
+                        c2.restore();
+                    }
+                }],
+            });
+        },
+
+        mleDrawContour() {
+            const ctx = document.getElementById('mleContourChart');
+            if (!ctx || !this.mle._contour) return;
+            if (this.mleContourChart) this.mleContourChart.destroy();
+
+            const contour = this.mle._contour;
+            const muAxis = this.mle._muAxis;
+            const sigmaAxis = this.mle._sigmaAxis;
+            if (!muAxis || !sigmaAxis || muAxis.length === 0) return;
+
+            // build a bubble chart: each (mu, sigma) gets a bubble whose color encodes loglik
+            const maxLL = Math.max(...contour.map(p => p.logLikelihood));
+            const minLL = Math.min(...contour.map(p => p.logLikelihood));
+            const range = maxLL - minLL || 1;
+
+            const points = contour.map(p => ({
+                x: p.mu,
+                y: p.sigma,
+                r: 4,
+                ll: p.logLikelihood,
+            }));
+
+            const mleMu = parseFloat(this.mle.estMean);
+            const mleSigma = parseFloat(this.mle.estSigma);
+
+            this.mleContourChart = new Chart(ctx, {
+                type: 'bubble',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Log-Likelihood',
+                            data: points,
+                            backgroundColor: points.map(p => {
+                                const t = (p.ll - minLL) / range;
+                                const r = Math.round(255 * (1 - t));
+                                const g = Math.round(100 + 155 * t);
+                                const b = Math.round(100 * t);
+                                return `rgba(${r},${g},${b},0.7)`;
+                            }),
+                            borderWidth: 0,
+                        },
+                        {
+                            label: 'MLE',
+                            data: [{ x: mleMu, y: mleSigma, r: 8 }],
+                            backgroundColor: '#dc3545',
+                            borderColor: '#fff',
+                            borderWidth: 2,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (item) => {
+                                    if (item.datasetIndex === 1) return `MLE: μ=${mleMu}, σ=${mleSigma}`;
+                                    const d = item.raw;
+                                    return `μ=${d.x.toFixed(2)}, σ=${d.y.toFixed(2)}, LL=${d.ll.toFixed(1)}`;
+                                },
+                            }
+                        },
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'μ (mean)' } },
+                        y: { title: { display: true, text: 'σ (std dev)' } },
+                    },
+                },
+            });
+        },
+
+        mleDrawBinomialChart() {
+            const ctx = document.getElementById('mleBinomialChart');
+            if (!ctx || !this.mle._llCurve) return;
+            if (this.mleBinChart) this.mleBinChart.destroy();
+
+            const curve = this.mle._llCurve;
+            const labels = curve.map(p => p.x.toFixed(3));
+            const values = curve.map(p => p.y);
+            const mleP = parseFloat(this.mle.estP);
+
+            const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+
+            this.mleBinChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Log-Likelihood',
+                        data: values,
+                        borderColor: primary,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        backgroundColor: 'rgba(13, 110, 253, 0.08)',
+                        tension: 0.3,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => 'p = ' + items[0].label,
+                                label: (item) => 'LL = ' + Number(item.raw).toFixed(2),
+                            }
+                        },
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'p (probability)' }, ticks: { maxTicksLimit: 11 } },
+                        y: { title: { display: true, text: 'Log-Likelihood' } },
+                    },
+                },
+                plugins: [{
+                    id: 'mleLine',
+                    afterDraw: (chart) => {
+                        const { ctx: c2, chartArea: { left, right, top, bottom } } = chart;
+                        const xMin = parseFloat(labels[0]);
+                        const xMax = parseFloat(labels[labels.length - 1]);
+                        const px = left + ((mleP - xMin) / (xMax - xMin)) * (right - left);
+                        c2.save();
+                        c2.strokeStyle = '#dc3545';
+                        c2.lineWidth = 2;
+                        c2.setLineDash([5, 3]);
+                        c2.beginPath();
+                        c2.moveTo(px, top);
+                        c2.lineTo(px, bottom);
+                        c2.stroke();
+                        c2.fillStyle = '#dc3545';
+                        c2.font = 'bold 11px sans-serif';
+                        c2.textAlign = 'center';
+                        c2.fillText('p̂=' + mleP.toFixed(3), px, top - 5);
+                        c2.restore();
+                    }
+                }],
+            });
+        },
+
+        // ═══════════════════════════════════════════════
+        // Confidence Intervals: Presets
+        // ═══════════════════════════════════════════════
+        ciLoadExample(name) {
+            this.ciReset();
+            if (name === 'large') {
+                this.ci.sampleMean = 52.3; this.ci.stdDev = 8.0;
+                this.ci.sampleSize = 100; this.ci.confLevel = '0.95';
+                this.ci.isPopStdDev = true;
+            } else if (name === 'small') {
+                this.ci.sampleMean = 98.5; this.ci.stdDev = 12.3;
+                this.ci.sampleSize = 15; this.ci.confLevel = '0.95';
+                this.ci.isPopStdDev = false;
+            } else if (name === 'precise') {
+                this.ci.sampleMean = 175.2; this.ci.stdDev = 6.5;
+                this.ci.sampleSize = 50; this.ci.confLevel = '0.99';
+                this.ci.isPopStdDev = false;
+            }
+            this.$nextTick(() => this.ciCompute());
+        },
+
+        ciReset() {
+            this.ci.hasResult = false;
+            this.ci.lower = ''; this.ci.upper = ''; this.ci.moe = '';
+            this.ci.critVal = ''; this.ci.intervalType = '';
+            this.ci.simRun = false; this.ci.simIntervals = [];
+            if (this.ciNumberLineChart) { this.ciNumberLineChart.destroy(); this.ciNumberLineChart = null; }
+            if (this.ciSimChart) { this.ciSimChart.destroy(); this.ciSimChart = null; }
+        },
+
+        // ═══════════════════════════════════════════════
+        // Confidence Intervals: Compute
+        // ═══════════════════════════════════════════════
+        async ciCompute() {
+            this.ci.loading = true;
+            try {
+                const form = document.getElementById('ciForm');
+                const fd = new FormData(form);
+                fd.set('sampleMean', this.ci.sampleMean);
+                fd.set('stdDev', this.ci.stdDev);
+                fd.set('sampleSize', this.ci.sampleSize);
+                fd.set('confidenceLevel', parseFloat(this.ci.confLevel));
+                fd.set('isPopulationStdDev', this.ci.isPopStdDev);
+
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+
+                this.ci.lower = data.lowerBound.toFixed(4);
+                this.ci.upper = data.upperBound.toFixed(4);
+                this.ci.moe = data.marginOfError.toFixed(4);
+                this.ci.critVal = data.criticalValue.toFixed(4);
+                this.ci.intervalType = data.intervalType;
+                this.ci.hasResult = true;
+
+                this.$nextTick(() => this.ciDrawNumberLine());
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                this.ci.loading = false;
+            }
+        },
+
+        // ═══════════════════════════════════════════════
+        // Confidence Intervals: Number Line Chart
+        // ═══════════════════════════════════════════════
+        ciDrawNumberLine() {
+            const ctx = document.getElementById('ciNumberLine');
+            if (!ctx) return;
+            if (this.ciNumberLineChart) this.ciNumberLineChart.destroy();
+
+            const mean = this.ci.sampleMean;
+            const lo = parseFloat(this.ci.lower);
+            const hi = parseFloat(this.ci.upper);
+            const moe = parseFloat(this.ci.moe);
+            const pad = moe * 0.5;
+
+            const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+
+            this.ciNumberLineChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Interval',
+                            data: [{ x: lo, y: 0 }, { x: hi, y: 0 }],
+                            showLine: true,
+                            borderColor: primary,
+                            borderWidth: 4,
+                            pointRadius: 6,
+                            pointBackgroundColor: primary,
+                        },
+                        {
+                            label: 'Sample Mean',
+                            data: [{ x: mean, y: 0 }],
+                            pointRadius: 8,
+                            pointBackgroundColor: '#dc3545',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (item) => {
+                                    if (item.datasetIndex === 1) return 'x̄ = ' + mean;
+                                    return item.dataIndex === 0 ? 'Lower: ' + lo : 'Upper: ' + hi;
+                                }
+                            }
+                        },
+                    },
+                    scales: {
+                        x: {
+                            min: lo - pad,
+                            max: hi + pad,
+                            title: { display: true, text: 'Value' },
+                        },
+                        y: { display: false, min: -1, max: 1 },
+                    },
+                },
+                plugins: [{
+                    id: 'ciAnnotation',
+                    afterDraw: (chart) => {
+                        const { ctx: c2, chartArea: { left, right, top, bottom } } = chart;
+                        const midY = (top + bottom) / 2;
+                        c2.save();
+                        c2.fillStyle = 'var(--tc-text-muted)';
+                        c2.font = '11px sans-serif';
+                        c2.textAlign = 'center';
+                        const xScale = chart.scales.x;
+                        const loPx = xScale.getPixelForValue(lo);
+                        const hiPx = xScale.getPixelForValue(hi);
+                        const meanPx = xScale.getPixelForValue(mean);
+                        c2.fillText(lo.toFixed(2), loPx, midY + 25);
+                        c2.fillText(hi.toFixed(2), hiPx, midY + 25);
+                        c2.fillStyle = '#dc3545';
+                        c2.font = 'bold 11px sans-serif';
+                        c2.fillText('x̄=' + mean.toFixed(2), meanPx, midY - 20);
+                        // MOE arrows
+                        c2.fillStyle = '#6c757d';
+                        c2.font = '10px sans-serif';
+                        c2.fillText('← ±' + moe.toFixed(2) + ' →', (loPx + hiPx) / 2, midY + 40);
+                        c2.restore();
+                    }
+                }],
+            });
+        },
+
+        // ═══════════════════════════════════════════════
+        // Confidence Intervals: Repeated Sampling Demo
+        // ═══════════════════════════════════════════════
+        ciRunSimulation() {
+            const trueMu = this.ci.simMu;
+            const sigma = this.ci.stdDev || 10;
+            const n = this.ci.sampleSize || 25;
+            const confLevel = parseFloat(this.ci.confLevel);
+            const zStar = this._normalQuantile((1 + confLevel) / 2);
+            const se = sigma / Math.sqrt(n);
+
+            const intervals = [];
+            let captured = 0;
+            for (let i = 0; i < 100; i++) {
+                // simulate a sample mean from N(trueMu, se^2)
+                let u1 = 0, u2 = 0;
+                while (u1 === 0) u1 = Math.random();
+                while (u2 === 0) u2 = Math.random();
+                const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+                const xbar = trueMu + z * se;
+                const lo = xbar - zStar * se;
+                const hi = xbar + zStar * se;
+                const captures = lo <= trueMu && trueMu <= hi;
+                if (captures) captured++;
+                intervals.push({ lo, hi, xbar, captures });
+            }
+
+            this.ci.simIntervals = intervals;
+            this.ci.simCapture = captured;
+            this.ci.simPct = captured; // out of 100
+            this.ci.simRun = true;
+            this.$nextTick(() => this.ciDrawSimChart());
+        },
+
+        ciDrawSimChart() {
+            const ctx = document.getElementById('ciSimChart');
+            if (!ctx) return;
+            if (this.ciSimChart) this.ciSimChart.destroy();
+
+            const intervals = this.ci.simIntervals;
+            const trueMu = this.ci.simMu;
+
+            // horizontal bar chart: each bar is an interval
+            const labels = intervals.map((_, i) => '' + (i + 1));
+            const barData = intervals.map(iv => [iv.lo, iv.hi]);
+            const colors = intervals.map(iv => iv.captures ? 'rgba(25,135,84,0.5)' : 'rgba(220,53,69,0.5)');
+            const borderColors = intervals.map(iv => iv.captures ? '#198754' : '#dc3545');
+
+            this.ciSimChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'CI',
+                        data: barData,
+                        backgroundColor: colors,
+                        borderColor: borderColors,
+                        borderWidth: 1,
+                        borderSkipped: false,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (item) => {
+                                    const iv = intervals[item.dataIndex];
+                                    return `[${iv.lo.toFixed(2)}, ${iv.hi.toFixed(2)}] ${iv.captures ? '✓' : '✗'}`;
+                                }
+                            }
+                        },
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Value' },
+                        },
+                        y: {
+                            display: false,
+                        },
+                    },
+                },
+                plugins: [{
+                    id: 'trueMuLine',
+                    afterDraw: (chart) => {
+                        const { ctx: c2, chartArea: { top, bottom }, scales: { x } } = chart;
+                        const px = x.getPixelForValue(trueMu);
+                        c2.save();
+                        c2.strokeStyle = '#dc3545';
+                        c2.lineWidth = 2;
+                        c2.setLineDash([5, 3]);
+                        c2.beginPath();
+                        c2.moveTo(px, top);
+                        c2.lineTo(px, bottom);
+                        c2.stroke();
+                        c2.fillStyle = '#dc3545';
+                        c2.font = 'bold 11px sans-serif';
+                        c2.textAlign = 'center';
+                        c2.fillText('μ=' + trueMu, px, top - 5);
+                        c2.restore();
+                    }
+                }],
+            });
+        },
+
+        // ═══════════════════════════════════════════════
+        // Non-Parametric: Sign Test
+        // ═══════════════════════════════════════════════
+        npSignTest() {
+            const values = this.np.signTestData.split(/[,\s\n]+/).map(s => parseFloat(s.trim())).filter(v => !isNaN(v) && v !== 0);
+            if (values.length < 2) { alert('Need at least 2 non-zero differences.'); return; }
+
+            const pos = values.filter(v => v > 0).length;
+            const neg = values.filter(v => v < 0).length;
+            const n = pos + neg;
+            const s = Math.min(pos, neg);
+
+            // binomial p-value: P(X <= s) under H0: p=0.5 (two-tailed)
+            let pValue = 0;
+            for (let k = 0; k <= s; k++) {
+                pValue += this._binomialPmf(n, k, 0.5);
+            }
+            pValue *= 2; // two-tailed
+            pValue = Math.min(pValue, 1);
+
+            this.np.signPos = pos;
+            this.np.signNeg = neg;
+            this.np.signStat = s;
+            this.np.signPValue = pValue < 0.0001 ? pValue.toExponential(4) : pValue.toFixed(4);
+            this.np.signReject = pValue < 0.05;
+            this.np.signResult = true;
+        },
+
+        _binomialPmf(n, k, p) {
+            // C(n,k) * p^k * (1-p)^(n-k)
+            let logC = 0;
+            for (let i = 0; i < k; i++) {
+                logC += Math.log(n - i) - Math.log(i + 1);
+            }
+            return Math.exp(logC + k * Math.log(p) + (n - k) * Math.log(1 - p));
+        },
+    };
+}
+</script>

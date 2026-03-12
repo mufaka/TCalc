@@ -1,0 +1,1670 @@
+﻿@page
+@model TCalc.Web.Pages.SimulationModel
+@{
+    ViewData["Title"] = "Simulation";
+}
+
+<div x-data="simulationApp()" x-cloak>
+
+    <!-- ─── Header ─── -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+        <div>
+            <h1 class="calc-title mb-0">🎯 Simulation</h1>
+            <p class="text-muted mb-0" style="font-size:.9rem;">
+                Experimental probability, Monte Carlo methods, Markov chains, and stochastic processes
+            </p>
+        </div>
+    </div>
+
+    <!-- ─── Section Tabs ─── -->
+    <div class="prob-type-selector mb-4">
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'experimental' && 'active'"
+                @@click="tab = 'experimental'">Experimental Probability</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'montecarlo' && 'active'"
+                @@click="tab = 'montecarlo'">Monte Carlo</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'markov' && 'active'"
+                @@click="tab = 'markov'">Markov Chains</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'stochastic' && 'active'"
+                @@click="tab = 'stochastic'">Stochastic Processes</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 1 — Experimental Probability (Simulation)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'experimental'" x-transition>
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Experimental Probability</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Run trials and observe how experimental probability converges to theoretical probability
+                        as the number of trials increases (Law of Large Numbers).
+                    </p>
+
+                    <!-- Experiment type -->
+                    <div class="mb-3">
+                        <label class="form-label">Experiment</label>
+                        <select class="form-select" x-model="exp.type" @@change="resetExperiment()">
+                            <option value="coin">Coin Flip (P = 0.5)</option>
+                            <option value="die">Dice Roll — specific number (P = 1/6)</option>
+                            <option value="custom">Custom probability</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" x-show="exp.type === 'custom'">
+                        <label class="form-label">Theoretical P(success)</label>
+                        <input type="number" class="form-control" min="0" max="1" step="0.01"
+                               x-model.number="exp.customP" @@input="resetExperiment()" />
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(1)">+1 Trial</button>
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(10)">+10</button>
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(100)">+100</button>
+                        <button type="button" class="btn btn-primary flex-fill"
+                                @@click="runTrials(1000)">+1000</button>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary w-100 mb-3"
+                            @@click="resetExperiment()">Reset</button>
+
+                    <div class="prob-result-card">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Total trials</span>
+                            <span class="prob-stat-value" x-text="exp.total"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Successes</span>
+                            <span class="prob-stat-value" x-text="exp.successes"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Experimental P</span>
+                            <span class="prob-stat-value"
+                                  x-text="exp.total > 0 ? fmt(exp.successes / exp.total) : '—'"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Theoretical P</span>
+                            <span class="prob-stat-value" x-text="fmt(getTheoreticalP())"></span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="prob-stat-label">Difference</span>
+                            <span class="prob-stat-value"
+                                  x-text="exp.total > 0 ? fmt(Math.abs(exp.successes / exp.total - getTheoreticalP())) : '—'"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Convergence chart -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Convergence Chart</h2>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        Watch experimental probability (blue) approach the theoretical value (dashed line) as trials increase.
+                    </p>
+                    <div class="prob-chart-container">
+                        <canvas id="convergenceChart"></canvas>
+                    </div>
+
+                    <!-- Recent trials ribbon -->
+                    <template x-if="exp.recentResults.length > 0">
+                        <div class="mt-3">
+                            <p class="text-muted mb-1" style="font-size:.82rem;">Last 20 trials:</p>
+                            <div class="d-flex flex-wrap gap-1">
+                                <template x-for="(r, i) in exp.recentResults" :key="i">
+                                    <span class="prob-trial-pip"
+                                          :class="r ? 'prob-trial-hit' : 'prob-trial-miss'"
+                                          :title="r ? 'Success' : 'Fail'">
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 2 — Monte Carlo Simulations
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'montecarlo'" x-transition>
+
+        <!-- Sub-tab selector -->
+        <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-sm" :class="mc.mode === 'pi' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @@click="mc.mode = 'pi'">Estimate π</button>
+            <button type="button" class="btn btn-sm" :class="mc.mode === 'integrate' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @@click="mc.mode = 'integrate'">Integration</button>
+        </div>
+
+        <!-- ── Estimate π ── -->
+        <div x-show="mc.mode === 'pi'">
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <div class="calc-container">
+                        <h2 class="calc-title">🎯 Estimate π</h2>
+                        <p class="text-muted" style="font-size:.85rem;">
+                            Throw random darts at a unit square. The fraction landing inside the
+                            quarter-circle approximates π/4.
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Sample Count</label>
+                            <input type="range" class="form-range" min="100" max="100000" step="100"
+                                   x-model.number="mc.piCount">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem;color:var(--tc-text-muted);">
+                                <span>100</span>
+                                <span x-text="mc.piCount.toLocaleString()"></span>
+                                <span>100,000</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-primary btn-sm" @@click="mcEstimatePi()">
+                                Run Simulation
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" @@click="mcResetPi()">
+                                Reset
+                            </button>
+                        </div>
+
+                        <!-- Results -->
+                        <template x-if="mc.piResult">
+                            <div class="prob-result-grid mt-3">
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">π Estimate</span>
+                                    <span class="prob-result-value" x-text="mc.piResult.piEstimate.toFixed(6)"></span>
+                                </div>
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Actual π</span>
+                                    <span class="prob-result-value">3.141593</span>
+                                </div>
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Error</span>
+                                    <span class="prob-result-value" x-text="Math.abs(mc.piResult.piEstimate - Math.PI).toFixed(6)"></span>
+                                </div>
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Inside Circle</span>
+                                    <span class="prob-result-value" x-text="mc.piResult.insideCircle.toLocaleString() + ' / ' + mc.piResult.totalPoints.toLocaleString()"></span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Teaching callout -->
+                        <div class="prob-teach-card mt-3">
+                            <button class="btn btn-sm btn-outline-info w-100" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#mcPiLearn">
+                                💡 How it works
+                            </button>
+                            <div class="collapse mt-2" id="mcPiLearn">
+                                <p style="font-size:.85rem;">A quarter-circle of radius 1 has area π/4 inside a 1×1 square (area 1). Random points land inside the circle with probability π/4, so:</p>
+                                <p class="text-center fw-bold" style="font-size:.95rem;">π ≈ 4 × (points inside) / (total points)</p>
+                                <p style="font-size:.85rem;">More points → better estimate. This is the essence of Monte Carlo: <strong>trade randomness for generality</strong>.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="calc-container">
+                        <h3 class="calc-title">Scatter Plot</h3>
+                        <div style="position:relative;height:420px;">
+                            <canvas id="mcPiChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Integration ── -->
+        <div x-show="mc.mode === 'integrate'">
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <div class="calc-container">
+                        <h2 class="calc-title">∫ Monte Carlo Integration</h2>
+                        <p class="text-muted" style="font-size:.85rem;">
+                            Estimate ∫ f(x) dx over [a, b] by sampling random x values and
+                            averaging f(x) × (b − a).
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Function f(x)</label>
+                            <select class="form-select form-select-sm" x-model="mc.intFunc">
+                                <option value="x^2">x²</option>
+                                <option value="x^3">x³</option>
+                                <option value="sin(x)">sin(x)</option>
+                                <option value="cos(x)">cos(x)</option>
+                                <option value="e^x">eˣ</option>
+                                <option value="e^(-x^2)">e^(−x²)</option>
+                                <option value="sqrt(x)">√x</option>
+                                <option value="1/x">1/x</option>
+                            </select>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Lower bound (a)</label>
+                                <input type="number" class="form-control form-control-sm" step="0.1"
+                                       x-model.number="mc.intA">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Upper bound (b)</label>
+                                <input type="number" class="form-control form-control-sm" step="0.1"
+                                       x-model.number="mc.intB">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Sample Count</label>
+                            <input type="range" class="form-range" min="100" max="100000" step="100"
+                                   x-model.number="mc.intCount">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem;color:var(--tc-text-muted);">
+                                <span>100</span>
+                                <span x-text="mc.intCount.toLocaleString()"></span>
+                                <span>100,000</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-primary btn-sm" @@click="mcIntegrate()">
+                                Estimate Integral
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" @@click="mcResetIntegrate()">
+                                Reset
+                            </button>
+                        </div>
+
+                        <!-- Results -->
+                        <template x-if="mc.intResult">
+                            <div class="prob-result-grid mt-3">
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">MC Estimate</span>
+                                    <span class="prob-result-value" x-text="mc.intResult.estimate.toFixed(6)"></span>
+                                </div>
+                                <template x-if="mc.intResult.exactValue !== null">
+                                    <div class="prob-result-item">
+                                        <span class="prob-result-label">Exact Value</span>
+                                        <span class="prob-result-value" x-text="mc.intResult.exactValue.toFixed(6)"></span>
+                                    </div>
+                                </template>
+                                <template x-if="mc.intResult.exactValue !== null">
+                                    <div class="prob-result-item">
+                                        <span class="prob-result-label">Error</span>
+                                        <span class="prob-result-value" x-text="Math.abs(mc.intResult.estimate - mc.intResult.exactValue).toFixed(6)"></span>
+                                    </div>
+                                </template>
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Samples</span>
+                                    <span class="prob-result-value" x-text="mc.intResult.sampleCount.toLocaleString()"></span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Teaching callout -->
+                        <div class="prob-teach-card mt-3">
+                            <button class="btn btn-sm btn-outline-info w-100" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#mcIntLearn">
+                                💡 Learn
+                            </button>
+                            <div class="collapse mt-2" id="mcIntLearn">
+                                <p style="font-size:.85rem;">Monte Carlo integration works by randomly sampling x values in [a, b], evaluating f(x) for each, then computing:</p>
+                                <p class="text-center fw-bold" style="font-size:.95rem;">∫ₐᵇ f(x) dx ≈ (b − a) × average of f(x₁), f(x₂), …, f(xₙ)</p>
+                                <p style="font-size:.85rem;">Monte Carlo trades exactness for generality — it works even when calculus doesn't.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="calc-container">
+                        <h3 class="calc-title">Sample Points</h3>
+                        <div style="position:relative;height:420px;">
+                            <canvas id="mcIntChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 3 — Markov Chain Simulator
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'markov'" x-transition>
+        <div class="row g-4">
+            <!-- Left panel: state editor + transition matrix -->
+            <div class="col-lg-6">
+                <div class="calc-container">
+                    <h2 class="calc-title">🔗 Markov Chain Simulator</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Define states and transition probabilities, then step through the chain
+                        and compare visit frequencies to the theoretical steady state.
+                    </p>
+
+                    <!-- Presets -->
+                    <div class="mb-3">
+                        <label class="form-label">Load Preset</label>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button class="btn btn-outline-secondary btn-sm" @@click="mkLoadPreset('weather')">Weather</button>
+                            <button class="btn btn-outline-secondary btn-sm" @@click="mkLoadPreset('random_walk')">Random Walk</button>
+                            <button class="btn btn-outline-secondary btn-sm" @@click="mkLoadPreset('pagerank')">Page Rank</button>
+                            <button class="btn btn-outline-secondary btn-sm" @@click="mkLoadPreset('gambler')">Gambler's Ruin</button>
+                        </div>
+                    </div>
+
+                    <!-- State labels -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            States (<span x-text="mk.states.length"></span>)
+                            <button class="btn btn-outline-primary btn-sm ms-2" @@click="mkAddState()" x-show="mk.states.length < 6">+ Add</button>
+                        </label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <template x-for="(s, i) in mk.states" :key="i">
+                                <div class="input-group input-group-sm" style="width:auto;">
+                                    <span class="input-group-text" x-text="'S' + i" style="font-size:.75rem;"></span>
+                                    <input type="text" class="form-control form-control-sm" style="width:80px;"
+                                           x-model="mk.states[i]">
+                                    <button class="btn btn-outline-danger btn-sm" @@click="mkRemoveState(i)"
+                                            x-show="mk.states.length > 2">&times;</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Transition matrix editor -->
+                    <div class="mb-3">
+                        <label class="form-label">Transition Matrix</label>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered text-center" style="font-size:.82rem;">
+                                <thead>
+                                    <tr>
+                                        <th style="width:60px;">From \ To</th>
+                                        <template x-for="(s, j) in mk.states" :key="'h'+j">
+                                            <th x-text="s" style="min-width:60px;"></th>
+                                        </template>
+                                        <th>Σ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(row, i) in mk.matrix" :key="'r'+i">
+                                        <tr>
+                                            <td class="fw-bold" x-text="mk.states[i]"></td>
+                                            <template x-for="(val, j) in row" :key="'c'+i+'_'+j">
+                                                <td>
+                                                    <input type="number" class="form-control form-control-sm text-center"
+                                                           style="width:60px;margin:0 auto;padding:2px 4px;"
+                                                           step="0.05" min="0" max="1"
+                                                           :value="mk.matrix[i][j]"
+                                                           @@input="mk.matrix[i][j] = parseFloat($event.target.value) || 0">
+                                                </td>
+                                            </template>
+                                            <td :class="Math.abs(mk.matrix[i].reduce((a,b) => a+b, 0) - 1) > 0.01 ? 'text-danger fw-bold' : 'text-success'"
+                                                x-text="mk.matrix[i].reduce((a,b) => a+b, 0).toFixed(2)"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div x-show="mk.matrixError" class="text-danger" style="font-size:.8rem;" x-text="mk.matrixError"></div>
+                    </div>
+
+                    <!-- Step controls -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button class="btn btn-primary btn-sm" @@click="mkStep(1)">Next Step</button>
+                        <button class="btn btn-outline-primary btn-sm" @@click="mkStep(10)">+10 Steps</button>
+                        <button class="btn btn-outline-primary btn-sm" @@click="mkStep(100)">+100 Steps</button>
+                        <button class="btn btn-outline-secondary btn-sm" @@click="mkAutoToggle()"
+                                x-text="mk.autoRunning ? '⏸ Stop' : '▶ Auto-run'"></button>
+                        <button class="btn btn-outline-secondary btn-sm" @@click="mkReset()">Reset</button>
+                    </div>
+
+                    <!-- Current state -->
+                    <div class="prob-result-grid">
+                        <div class="prob-result-item">
+                            <span class="prob-result-label">Current State</span>
+                            <span class="prob-result-value" x-text="mk.states[mk.current] || '—'"></span>
+                        </div>
+                        <div class="prob-result-item">
+                            <span class="prob-result-label">Total Steps</span>
+                            <span class="prob-result-value" x-text="mk.totalSteps"></span>
+                        </div>
+                    </div>
+
+                    <!-- Teaching callout -->
+                    <div class="prob-teach-card mt-3">
+                        <button class="btn btn-sm btn-outline-info w-100" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#mkLearn">
+                            💡 The Markov Property
+                        </button>
+                        <div class="collapse mt-2" id="mkLearn">
+                            <p style="font-size:.85rem;"><strong>The Markov property:</strong> the future depends only on the present, not the past. Given the current state, the history of how we got here is irrelevant.</p>
+                            <p style="font-size:.85rem;">As steps increase, visit frequencies converge to the <strong>steady-state distribution</strong> — the long-run proportion of time spent in each state.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right panel: state diagram + visit frequency chart -->
+            <div class="col-lg-6">
+                <!-- State diagram (SVG) -->
+                <div class="calc-container mb-4">
+                    <h3 class="calc-title">State Diagram</h3>
+                    <div class="text-center" style="overflow:auto;">
+                        <svg :id="'mkSvg'" :width="mk.states.length <= 3 ? 360 : 460" height="280"
+                             style="background:var(--tc-bg-offset);border-radius:8px;">
+                            <!-- State circles and transition arrows rendered by mkRenderSvg() -->
+                            <template x-for="(arrow, ai) in mk.svgArrows" :key="'a'+ai">
+                                <g>
+                                    <line :x1="arrow.x1" :y1="arrow.y1" :x2="arrow.x2" :y2="arrow.y2"
+                                          stroke="var(--tc-text-muted)" stroke-width="1.5"
+                                          :marker-end="'url(#arrowhead)'"></line>
+                                    <text :x="arrow.lx" :y="arrow.ly" text-anchor="middle"
+                                          style="font-size:10px;fill:var(--tc-text-muted);"
+                                          x-text="arrow.label"></text>
+                                </g>
+                            </template>
+                            <template x-for="(node, ni) in mk.svgNodes" :key="'n'+ni">
+                                <g>
+                                    <circle :cx="node.cx" :cy="node.cy" r="28"
+                                            :fill="ni === mk.current ? 'var(--tc-primary)' : 'var(--tc-bg-offset)'"
+                                            :stroke="ni === mk.current ? 'var(--tc-primary)' : 'var(--tc-text-muted)'"
+                                            stroke-width="2"></circle>
+                                    <text :x="node.cx" :y="node.cy + 4" text-anchor="middle"
+                                          :style="'font-size:11px;font-weight:600;fill:' + (ni === mk.current ? '#fff' : 'var(--tc-text-muted)')"
+                                          x-text="node.label"></text>
+                                </g>
+                            </template>
+                            <defs>
+                                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                                    <polygon points="0 0, 8 3, 0 6" fill="var(--tc-text-muted)"></polygon>
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Visit frequency chart -->
+                <div class="calc-container mb-4">
+                    <h3 class="calc-title">Visit Frequencies vs Steady State</h3>
+                    <div style="position:relative;height:280px;">
+                        <canvas id="mkFreqChart"></canvas>
+                    </div>
+                    <div class="d-flex justify-content-end mt-2">
+                        <button class="btn btn-outline-secondary btn-sm" @@click="mkComputeSteadyState()">
+                            Compute Steady State
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History trail -->
+                <div class="calc-container">
+                    <h3 class="calc-title">Recent History</h3>
+                    <div class="d-flex flex-wrap gap-1" style="max-height:80px;overflow-y:auto;">
+                        <template x-for="(s, hi) in mk.history.slice(-50)" :key="'h'+hi">
+                            <span class="badge" style="font-size:.7rem;"
+                                  :style="'background:' + mkStateColor(s)"
+                                  x-text="mk.states[s]"></span>
+                        </template>
+                        <span x-show="mk.history.length === 0" class="text-muted" style="font-size:.8rem;">No steps yet</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 4 — Stochastic Processes
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'stochastic'" x-transition>
+
+        <!-- Sub-tab selector -->
+        <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-sm" :class="sp.mode === 'brownian' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @@click="sp.mode = 'brownian'">Brownian Motion</button>
+            <button type="button" class="btn btn-sm" :class="sp.mode === 'poisson' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @@click="sp.mode = 'poisson'">Poisson Process</button>
+        </div>
+
+        <!-- ── Brownian Motion ── -->
+        <div x-show="sp.mode === 'brownian'">
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <div class="calc-container">
+                        <h2 class="calc-title">📈 Brownian Motion</h2>
+                        <p class="text-muted" style="font-size:.85rem;">
+                            Generate random walk paths with configurable drift (μ) and volatility (σ).
+                            Overlay multiple sample paths to visualize the "cone of uncertainty."
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Drift (μ)</label>
+                            <input type="range" class="form-range" min="-1" max="1" step="0.05"
+                                   x-model.number="sp.bm.drift">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem;color:var(--tc-text-muted);">
+                                <span>-1</span>
+                                <span x-text="sp.bm.drift.toFixed(2)"></span>
+                                <span>1</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Volatility (σ)</label>
+                            <input type="range" class="form-range" min="0" max="2" step="0.05"
+                                   x-model.number="sp.bm.volatility">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem;color:var(--tc-text-muted);">
+                                <span>0</span>
+                                <span x-text="sp.bm.volatility.toFixed(2)"></span>
+                                <span>2</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Time Step (Δt)</label>
+                            <select class="form-select form-select-sm" x-model.number="sp.bm.dt">
+                                <option value="0.01">0.01</option>
+                                <option value="0.02">0.02</option>
+                                <option value="0.05">0.05</option>
+                                <option value="0.1">0.1</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Steps</label>
+                            <input type="range" class="form-range" min="50" max="2000" step="50"
+                                   x-model.number="sp.bm.steps">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem;color:var(--tc-text-muted);">
+                                <span>50</span>
+                                <span x-text="sp.bm.steps"></span>
+                                <span>2000</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-primary btn-sm" @@click="spGenerateBrownian()">
+                                Generate Path
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" @@click="spAddBrownianPath()"
+                                    :disabled="sp.bm.paths.length >= 10">
+                                + Overlay Path
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" @@click="spResetBrownian()">
+                                Reset
+                            </button>
+                        </div>
+
+                        <div class="prob-result-grid">
+                            <div class="prob-result-item">
+                                <span class="prob-result-label">Paths Shown</span>
+                                <span class="prob-result-value" x-text="sp.bm.paths.length"></span>
+                            </div>
+                            <div class="prob-result-item">
+                                <span class="prob-result-label">Duration</span>
+                                <span class="prob-result-value" x-text="(sp.bm.steps * sp.bm.dt).toFixed(2) + 's'"></span>
+                            </div>
+                            <template x-if="sp.bm.paths.length > 0">
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Last Endpoint</span>
+                                    <span class="prob-result-value"
+                                          x-text="sp.bm.paths[sp.bm.paths.length-1].at(-1).value.toFixed(4)"></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Teaching callout -->
+                        <div class="prob-teach-card mt-3">
+                            <button class="btn btn-sm btn-outline-info w-100" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#spBmLearn">
+                                💡 How it works
+                            </button>
+                            <div class="collapse mt-2" id="spBmLearn">
+                                <p style="font-size:.85rem;"><strong>Brownian Motion</strong> (Wiener process) models continuous random movement. Each step adds:</p>
+                                <p class="text-center fw-bold" style="font-size:.95rem;">ΔX = μΔt + σ√Δt · Z, &nbsp; Z ~ N(0,1)</p>
+                                <p style="font-size:.85rem;">With <strong>drift μ</strong> = 0, the path wanders symmetrically. Positive drift pushes it upward. Higher <strong>volatility σ</strong> means wider swings.</p>
+                                <p style="font-size:.85rem;">Brownian Motion models stock prices, particle diffusion, and thermal fluctuations.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="calc-container">
+                        <h3 class="calc-title">Sample Paths</h3>
+                        <p class="text-muted mb-2" style="font-size:.82rem;">
+                            Each colored line is an independent sample path. Overlay multiple paths to see the "cone of uncertainty."
+                        </p>
+                        <div class="prob-chart-container" style="height:460px;">
+                            <canvas id="spBmChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Poisson Process ── -->
+        <div x-show="sp.mode === 'poisson'">
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <div class="calc-container">
+                        <h2 class="calc-title">⚡ Poisson Process</h2>
+                        <p class="text-muted" style="font-size:.85rem;">
+                            Generate event arrival times with configurable rate λ. Observe the step function of
+                            cumulative events and the inter-arrival time distribution.
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Rate (λ events/unit time)</label>
+                            <input type="range" class="form-range" min="0.5" max="20" step="0.5"
+                                   x-model.number="sp.pp.lambda">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem;color:var(--tc-text-muted);">
+                                <span>0.5</span>
+                                <span x-text="sp.pp.lambda.toFixed(1)"></span>
+                                <span>20</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Duration</label>
+                            <input type="range" class="form-range" min="1" max="100" step="1"
+                                   x-model.number="sp.pp.duration">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem;color:var(--tc-text-muted);">
+                                <span>1</span>
+                                <span x-text="sp.pp.duration"></span>
+                                <span>100</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-primary btn-sm" @@click="spGeneratePoisson()">
+                                Generate Events
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" @@click="spResetPoisson()">
+                                Reset
+                            </button>
+                        </div>
+
+                        <!-- Results -->
+                        <template x-if="sp.pp.result">
+                            <div class="prob-result-grid mt-3">
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Events</span>
+                                    <span class="prob-result-value" x-text="sp.pp.result.eventCount"></span>
+                                </div>
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Expected (λT)</span>
+                                    <span class="prob-result-value" x-text="(sp.pp.result.lambda * sp.pp.result.duration).toFixed(1)"></span>
+                                </div>
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Mean Inter-arrival</span>
+                                    <span class="prob-result-value"
+                                          x-text="sp.pp.result.interArrivalTimes.length > 0
+                                              ? (sp.pp.result.interArrivalTimes.reduce((a,b)=>a+b,0) / sp.pp.result.interArrivalTimes.length).toFixed(4)
+                                              : '—'"></span>
+                                </div>
+                                <div class="prob-result-item">
+                                    <span class="prob-result-label">Expected 1/λ</span>
+                                    <span class="prob-result-value" x-text="(1 / sp.pp.result.lambda).toFixed(4)"></span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Teaching callout -->
+                        <div class="prob-teach-card mt-3">
+                            <button class="btn btn-sm btn-outline-info w-100" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#spPpLearn">
+                                💡 How it works
+                            </button>
+                            <div class="collapse mt-2" id="spPpLearn">
+                                <p style="font-size:.85rem;">A <strong>Poisson Process</strong> models events that occur randomly at a constant average rate λ per unit time.</p>
+                                <p style="font-size:.85rem;">Key properties:</p>
+                                <ul style="font-size:.85rem;">
+                                    <li>Number of events in time T follows <strong>Poisson(λT)</strong></li>
+                                    <li>Inter-arrival times follow <strong>Exponential(λ)</strong> with mean 1/λ</li>
+                                    <li>Events in non-overlapping intervals are <strong>independent</strong></li>
+                                </ul>
+                                <p style="font-size:.85rem;">Poisson Processes model call arrivals, earthquakes, website hits, radioactive decay, and bus arrivals.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <!-- Cumulative events step function -->
+                    <div class="calc-container mb-4">
+                        <h3 class="calc-title">Cumulative Events (Step Function)</h3>
+                        <p class="text-muted mb-2" style="font-size:.82rem;">
+                            N(t) = number of events by time t. The step function jumps by 1 at each arrival.
+                            The dashed line shows the expected rate λt.
+                        </p>
+                        <div class="prob-chart-container" style="height:300px;">
+                            <canvas id="spPpStepChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Event timeline -->
+                    <template x-if="sp.pp.result && sp.pp.result.arrivalTimes.length > 0 && sp.pp.result.arrivalTimes.length <= 200">
+                        <div class="calc-container mb-4">
+                            <h3 class="calc-title">Event Timeline</h3>
+                            <div style="position:relative;height:48px;background:var(--tc-bg-offset);border-radius:6px;overflow-x:auto;">
+                                <div style="position:relative;height:100%;min-width:100%;">
+                                    <template x-for="(t, i) in sp.pp.result.arrivalTimes" :key="'tick'+i">
+                                        <div style="position:absolute;top:8px;bottom:8px;width:2px;background:var(--tc-primary);border-radius:1px;"
+                                             :style="'left:' + (t / sp.pp.result.duration * 100) + '%'"
+                                             :title="'Event ' + (i+1) + ' at t=' + t.toFixed(3)"></div>
+                                    </template>
+                                    <!-- Axis labels -->
+                                    <span class="text-muted" style="position:absolute;bottom:2px;left:4px;font-size:.7rem;">t=0</span>
+                                    <span class="text-muted" style="position:absolute;bottom:2px;right:4px;font-size:.7rem;"
+                                          x-text="'t=' + sp.pp.result.duration"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Inter-arrival time histogram -->
+                    <div class="calc-container">
+                        <h3 class="calc-title">Inter-Arrival Time Distribution</h3>
+                        <p class="text-muted mb-2" style="font-size:.82rem;">
+                            The histogram of times between consecutive events should converge to Exponential(λ) with mean 1/λ.
+                            The orange curve shows the theoretical Exponential density.
+                        </p>
+                        <div class="prob-chart-container" style="height:280px;">
+                            <canvas id="spPpHistChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Hidden forms for HTMX POSTs ─── -->
+    <form id="frmEstimatePi" method="post" asp-page-handler="EstimatePi" style="display:none;"></form>
+    <form id="frmIntegrate" method="post" asp-page-handler="Integrate" style="display:none;"></form>
+    <form id="frmSteadyState" method="post" asp-page-handler="SteadyState" style="display:none;"></form>
+    <form id="frmMarkovStep" method="post" asp-page-handler="MarkovStep" style="display:none;"></form>
+    <form id="frmBrownianMotion" method="post" asp-page-handler="BrownianMotion" style="display:none;"></form>
+    <form id="frmPoissonProcess" method="post" asp-page-handler="PoissonProcess" style="display:none;"></form>
+
+    <!-- ─── Quick Reference ─── -->
+    <div class="calc-container mt-4">
+        <h2 class="calc-title">📋 Quick Reference</h2>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Law of Large Numbers</div>
+                    <div class="prob-ref-formula">P̂(A) → P(A) as n → ∞</div>
+                    <div class="prob-ref-note">Experimental probability converges to theoretical</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Monte Carlo</div>
+                    <div class="prob-ref-formula">π ≈ 4 × (hits inside circle) / (total points)</div>
+                    <div class="prob-ref-note">Random sampling to estimate quantities</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Brownian Motion</div>
+                    <div class="prob-ref-formula">ΔX = μΔt + σ√Δt · Z</div>
+                    <div class="prob-ref-note">Continuous random walk with drift and volatility</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Poisson Process</div>
+                    <div class="prob-ref-formula">P(N(t) = k) = (λt)ᵏe⁻ˡᵗ / k!</div>
+                    <div class="prob-ref-note">Events arrive at rate λ; inter-arrivals ~ Exp(λ)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Cross-page Navigation ─── -->
+    <div class="d-flex justify-content-between mt-4 pt-3" style="border-top:1px solid var(--tc-border);">
+        <a asp-page="/Distributions" class="btn btn-outline-secondary">← Distributions</a>
+        <a asp-page="/Inference" class="btn btn-outline-primary">Inference →</a>
+    </div>
+</div>
+
+<script>
+function simulationApp() {
+    let convergenceChart = null;
+    let mcPiChart = null;
+    let mcIntChart = null;
+    let mkFreqChart = null;
+    let spBmChart = null;
+    let spPpStepChart = null;
+    let spPpHistChart = null;
+
+    const MC_COLORS = ['rgba(79,110,247,0.7)', 'rgba(231,76,60,0.7)', 'rgba(46,204,113,0.7)',
+                       'rgba(241,196,15,0.7)', 'rgba(155,89,182,0.7)', 'rgba(52,152,219,0.7)'];
+
+    const PATH_COLORS = [
+        'rgba(79,110,247,0.85)', 'rgba(231,76,60,0.85)', 'rgba(46,204,113,0.85)',
+        'rgba(241,196,15,0.85)', 'rgba(155,89,182,0.85)', 'rgba(52,152,219,0.85)',
+        'rgba(230,126,34,0.85)', 'rgba(26,188,156,0.85)', 'rgba(192,57,43,0.85)',
+        'rgba(127,140,141,0.85)'
+    ];
+
+    return {
+        tab: 'experimental',
+
+        // ── Experimental ──
+        exp: { type: 'coin', customP: 0.5, total: 0, successes: 0, history: [], recentResults: [] },
+
+        // ── Monte Carlo ──
+        mc: {
+            mode: 'pi',
+            piCount: 5000,
+            piResult: null,
+            intFunc: 'x^2', intA: 0, intB: 1, intCount: 5000,
+            intResult: null,
+        },
+
+        // ── Markov Chain ──
+        mk: {
+            states: ['Sunny', 'Rainy'],
+            matrix: [[0.8, 0.2], [0.4, 0.6]],
+            current: 0,
+            totalSteps: 0,
+            history: [],
+            visitCounts: [0, 0],
+            steadyState: null,
+            autoRunning: false,
+            autoTimer: null,
+            matrixError: '',
+            svgNodes: [],
+            svgArrows: [],
+        },
+
+        // ── Stochastic Processes ──
+        sp: {
+            mode: 'brownian',
+            bm: {
+                drift: 0,
+                volatility: 1,
+                dt: 0.01,
+                steps: 500,
+                paths: [],        // array of arrays of {time, value}
+            },
+            pp: {
+                lambda: 5,
+                duration: 10,
+                result: null,
+            },
+        },
+
+        init() {
+            this.initConvergenceChart();
+            this.mkUpdateSvg();
+        },
+
+        fmt(v) { return v == null ? '—' : +parseFloat(v).toFixed(6) + ''; },
+
+        getTheoreticalP() {
+            if (this.exp.type === 'coin') return 0.5;
+            if (this.exp.type === 'die') return 1 / 6;
+            return this.exp.customP || 0;
+        },
+
+        runTrials(n) {
+            const p = this.getTheoreticalP();
+            for (let i = 0; i < n; i++) {
+                const success = Math.random() < p;
+                if (success) this.exp.successes++;
+                this.exp.total++;
+                this.exp.recentResults.push(success);
+                if (this.exp.recentResults.length > 20) this.exp.recentResults.shift();
+                if (this.exp.total <= 20 || this.exp.total % Math.max(1, Math.floor(n / 20)) === 0 || i === n - 1) {
+                    this.exp.history.push({ trial: this.exp.total, prob: this.exp.successes / this.exp.total });
+                }
+            }
+            this.updateConvergenceChart();
+        },
+
+        resetExperiment() {
+            this.exp.total = 0;
+            this.exp.successes = 0;
+            this.exp.history = [];
+            this.exp.recentResults = [];
+            this.updateConvergenceChart();
+        },
+
+        initConvergenceChart() {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('convergenceChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                const ctx = canvas.getContext('2d');
+                convergenceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Experimental P',
+                                data: [],
+                                borderColor: 'rgba(79,110,247,1)',
+                                backgroundColor: 'rgba(79,110,247,0.1)',
+                                fill: false,
+                                tension: 0.3,
+                                pointRadius: 0,
+                                borderWidth: 2,
+                            },
+                            {
+                                label: 'Theoretical P',
+                                data: [],
+                                borderColor: 'rgba(231,76,60,0.7)',
+                                borderDash: [6, 4],
+                                fill: false,
+                                pointRadius: 0,
+                                borderWidth: 2,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 200 },
+                        plugins: { legend: { display: true, labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } } },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Trials', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)', maxTicksLimit: 10 },
+                                grid: { color: 'var(--tc-border)' }
+                            },
+                            y: {
+                                min: 0, max: 1,
+                                title: { display: true, text: 'Probability', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { color: 'var(--tc-border)' }
+                            }
+                        }
+                    }
+                });
+            });
+        },
+
+        updateConvergenceChart() {
+            if (!convergenceChart) return;
+            const p = this.getTheoreticalP();
+            convergenceChart.data.labels = this.exp.history.map(h => h.trial);
+            convergenceChart.data.datasets[0].data = this.exp.history.map(h => h.prob);
+            convergenceChart.data.datasets[1].data = this.exp.history.map(() => p);
+            convergenceChart.update();
+        },
+
+        // ═══════════════════════════════════════════════════════════
+        //  Monte Carlo — Estimate π
+        // ═══════════════════════════════════════════════════════════
+
+        async mcEstimatePi() {
+            const form = document.getElementById('frmEstimatePi');
+            const fd = new FormData(form);
+            fd.set('sampleCount', this.mc.piCount);
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                this.mc.piResult = data;
+                this.updateMcPiChart(data.points);
+            } catch (e) { console.error('mcEstimatePi', e); }
+        },
+
+        mcResetPi() {
+            this.mc.piResult = null;
+            if (mcPiChart) { mcPiChart.destroy(); mcPiChart = null; }
+        },
+
+        updateMcPiChart(points) {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('mcPiChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                if (mcPiChart) mcPiChart.destroy();
+
+                const inside = points.filter(p => p.inside);
+                const outside = points.filter(p => !p.inside);
+
+                mcPiChart = new Chart(canvas.getContext('2d'), {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Inside circle',
+                                data: inside.map(p => ({ x: p.x, y: p.y })),
+                                backgroundColor: 'rgba(79,110,247,0.5)',
+                                pointRadius: 1.5,
+                            },
+                            {
+                                label: 'Outside circle',
+                                data: outside.map(p => ({ x: p.x, y: p.y })),
+                                backgroundColor: 'rgba(231,76,60,0.3)',
+                                pointRadius: 1.5,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: { legend: { labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } } },
+                        scales: {
+                            x: { min: 0, max: 1, title: { display: true, text: 'x', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } },
+                            y: { min: 0, max: 1, title: { display: true, text: 'y', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } },
+                        }
+                    }
+                });
+            });
+        },
+
+        // ═══════════════════════════════════════════════════════════
+        //  Monte Carlo — Integration
+        // ═══════════════════════════════════════════════════════════
+
+        async mcIntegrate() {
+            const form = document.getElementById('frmIntegrate');
+            const fd = new FormData(form);
+            fd.set('functionName', this.mc.intFunc);
+            fd.set('a', this.mc.intA);
+            fd.set('b', this.mc.intB);
+            fd.set('sampleCount', this.mc.intCount);
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                this.mc.intResult = data;
+                this.updateMcIntChart(data.points);
+            } catch (e) { console.error('mcIntegrate', e); }
+        },
+
+        mcResetIntegrate() {
+            this.mc.intResult = null;
+            if (mcIntChart) { mcIntChart.destroy(); mcIntChart = null; }
+        },
+
+        updateMcIntChart(points) {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('mcIntChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                if (mcIntChart) mcIntChart.destroy();
+
+                const under = points.filter(p => p.underCurve);
+                const over = points.filter(p => !p.underCurve);
+
+                // Build the function curve
+                const curveX = [...new Set(points.map(p => p.x))].sort((a, b) => a - b);
+                const curveData = curveX.map(x => {
+                    const pt = points.find(p => Math.abs(p.x - x) < 1e-10);
+                    return { x, y: pt ? pt.functionY : 0 };
+                });
+
+                mcIntChart = new Chart(canvas.getContext('2d'), {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Under curve',
+                                data: under.map(p => ({ x: p.x, y: p.sampleY })),
+                                backgroundColor: 'rgba(46,204,113,0.4)',
+                                pointRadius: 1.5,
+                            },
+                            {
+                                label: 'Above curve',
+                                data: over.map(p => ({ x: p.x, y: p.sampleY })),
+                                backgroundColor: 'rgba(231,76,60,0.25)',
+                                pointRadius: 1.5,
+                            },
+                            {
+                                label: 'f(x)',
+                                type: 'line',
+                                data: curveData,
+                                borderColor: 'rgba(79,110,247,1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.3,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: { legend: { labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } } },
+                        scales: {
+                            x: { title: { display: true, text: 'x', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } },
+                            y: { title: { display: true, text: 'y', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } },
+                        }
+                    }
+                });
+            });
+        },
+
+        // ═══════════════════════════════════════════════════════════
+        //  Markov Chain
+        // ═══════════════════════════════════════════════════════════
+
+        mkLoadPreset(name) {
+            if (this.mk.autoRunning) this.mkAutoToggle();
+            const presets = {
+                weather: {
+                    states: ['Sunny', 'Rainy'],
+                    matrix: [[0.8, 0.2], [0.4, 0.6]],
+                },
+                random_walk: {
+                    states: ['Left', 'Center', 'Right'],
+                    matrix: [[0.3, 0.7, 0], [0.3, 0.4, 0.3], [0, 0.7, 0.3]],
+                },
+                pagerank: {
+                    states: ['Page A', 'Page B', 'Page C'],
+                    matrix: [[0, 0.5, 0.5], [1, 0, 0], [0.5, 0.5, 0]],
+                },
+                gambler: {
+                    states: ['$0', '$1', '$2', '$3'],
+                    matrix: [[1, 0, 0, 0], [0.5, 0, 0.5, 0], [0, 0.5, 0, 0.5], [0, 0, 0, 1]],
+                },
+            };
+            const p = presets[name];
+            if (!p) return;
+            this.mk.states = [...p.states];
+            this.mk.matrix = p.matrix.map(r => [...r]);
+            this.mkReset();
+        },
+
+        mkAddState() {
+            const n = this.mk.states.length;
+            if (n >= 6) return;
+            this.mk.states.push('S' + n);
+            for (let row of this.mk.matrix) row.push(0);
+            this.mk.matrix.push(new Array(n + 1).fill(0));
+            this.mk.matrix[n][n] = 1; // self-loop by default
+            this.mk.visitCounts.push(0);
+            this.mkUpdateSvg();
+        },
+
+        mkRemoveState(idx) {
+            if (this.mk.states.length <= 2) return;
+            this.mk.states.splice(idx, 1);
+            this.mk.matrix.splice(idx, 1);
+            for (let row of this.mk.matrix) row.splice(idx, 1);
+            this.mk.visitCounts.splice(idx, 1);
+            if (this.mk.current >= this.mk.states.length) this.mk.current = 0;
+            this.mkUpdateSvg();
+        },
+
+        mkValidateMatrix() {
+            const n = this.mk.states.length;
+            for (let i = 0; i < n; i++) {
+                const sum = this.mk.matrix[i].reduce((a, b) => a + b, 0);
+                if (Math.abs(sum - 1) > 0.01) {
+                    this.mk.matrixError = `Row "${this.mk.states[i]}" sums to ${sum.toFixed(2)}, must equal 1.`;
+                    return false;
+                }
+                for (let j = 0; j < n; j++) {
+                    if (this.mk.matrix[i][j] < 0) {
+                        this.mk.matrixError = `Negative probability at [${this.mk.states[i]}][${this.mk.states[j]}].`;
+                        return false;
+                    }
+                }
+            }
+            this.mk.matrixError = '';
+            return true;
+        },
+
+        mkStep(count) {
+            if (!this.mkValidateMatrix()) return;
+            const n = this.mk.states.length;
+            for (let s = 0; s < count; s++) {
+                // Pick next state from transition probabilities
+                const row = this.mk.matrix[this.mk.current];
+                let r = Math.random(), cum = 0, next = n - 1;
+                for (let j = 0; j < n; j++) {
+                    cum += row[j];
+                    if (r < cum) { next = j; break; }
+                }
+                this.mk.current = next;
+                this.mk.totalSteps++;
+                this.mk.visitCounts[next]++;
+                this.mk.history.push(next);
+            }
+            this.mkUpdateSvg();
+            this.updateMkFreqChart();
+        },
+
+        mkAutoToggle() {
+            if (this.mk.autoRunning) {
+                clearInterval(this.mk.autoTimer);
+                this.mk.autoTimer = null;
+                this.mk.autoRunning = false;
+            } else {
+                this.mk.autoRunning = true;
+                this.mk.autoTimer = setInterval(() => this.mkStep(1), 200);
+            }
+        },
+
+        mkReset() {
+            if (this.mk.autoRunning) this.mkAutoToggle();
+            this.mk.current = 0;
+            this.mk.totalSteps = 0;
+            this.mk.history = [];
+            this.mk.visitCounts = new Array(this.mk.states.length).fill(0);
+            this.mk.steadyState = null;
+            this.mk.matrixError = '';
+            this.mkUpdateSvg();
+            this.updateMkFreqChart();
+        },
+
+        async mkComputeSteadyState() {
+            if (!this.mkValidateMatrix()) return;
+            const form = document.getElementById('frmSteadyState');
+            const fd = new FormData(form);
+            fd.set('matrixJson', JSON.stringify(this.mk.matrix));
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                this.mk.steadyState = data.distribution;
+                this.updateMkFreqChart();
+            } catch (e) { console.error('mkComputeSteadyState', e); }
+        },
+
+        mkStateColor(idx) {
+            return MC_COLORS[idx % MC_COLORS.length];
+        },
+
+        mkUpdateSvg() {
+            const n = this.mk.states.length;
+            const w = n <= 3 ? 360 : 460;
+            const h = 280;
+            const cx = w / 2, cy = h / 2;
+            const radius = Math.min(w, h) / 2 - 45;
+
+            // Position states in a circle
+            const nodes = [];
+            for (let i = 0; i < n; i++) {
+                const angle = -Math.PI / 2 + (2 * Math.PI * i) / n;
+                nodes.push({ cx: cx + radius * Math.cos(angle), cy: cy + radius * Math.sin(angle), label: this.mk.states[i] });
+            }
+            this.mk.svgNodes = nodes;
+
+            // Build arrows for non-zero transitions (skip self-loops for simplicity in display)
+            const arrows = [];
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    const p = this.mk.matrix[i][j];
+                    if (p <= 0 || i === j) continue;
+                    const dx = nodes[j].cx - nodes[i].cx;
+                    const dy = nodes[j].cy - nodes[i].cy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist === 0) continue;
+                    const ux = dx / dist, uy = dy / dist;
+                    // Offset start/end by circle radius (28px)
+                    const x1 = nodes[i].cx + ux * 30;
+                    const y1 = nodes[i].cy + uy * 30;
+                    const x2 = nodes[j].cx - ux * 30;
+                    const y2 = nodes[j].cy - uy * 30;
+                    // Label position: midpoint with slight offset perpendicular
+                    const mx = (x1 + x2) / 2 - uy * 12;
+                    const my = (y1 + y2) / 2 + ux * 12;
+                    arrows.push({ x1, y1, x2, y2, lx: mx, ly: my, label: p.toFixed(2) });
+                }
+            }
+            this.mk.svgArrows = arrows;
+        },
+
+        updateMkFreqChart() {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('mkFreqChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+
+                const labels = this.mk.states;
+                const total = this.mk.totalSteps || 1;
+                const freq = this.mk.visitCounts.map(c => c / total);
+
+                const datasets = [
+                    {
+                        label: 'Visit Frequency',
+                        data: freq,
+                        backgroundColor: labels.map((_, i) => MC_COLORS[i % MC_COLORS.length]),
+                        borderWidth: 1,
+                    }
+                ];
+
+                if (this.mk.steadyState) {
+                    datasets.push({
+                        label: 'Steady State',
+                        data: this.mk.steadyState,
+                        backgroundColor: 'rgba(0,0,0,0)',
+                        borderColor: 'rgba(231,76,60,1)',
+                        borderWidth: 2,
+                        type: 'line',
+                        pointRadius: 5,
+                        pointStyle: 'crossRot',
+                    });
+                }
+
+                if (mkFreqChart) mkFreqChart.destroy();
+                mkFreqChart = new Chart(canvas.getContext('2d'), {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 150 },
+                        plugins: { legend: { labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } } },
+                        scales: {
+                            x: { ticks: { color: 'var(--tc-text-muted)' }, grid: { display: false } },
+                            y: { min: 0, max: 1, title: { display: true, text: 'Proportion', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } },
+                        }
+                    }
+                });
+            });
+        },
+
+        // ═══════════════════════════════════════════════════════════
+        //  Stochastic Processes — Brownian Motion
+        // ═══════════════════════════════════════════════════════════
+
+        async spGenerateBrownian() {
+            const form = document.getElementById('frmBrownianMotion');
+            const fd = new FormData(form);
+            fd.set('drift', this.sp.bm.drift);
+            fd.set('volatility', this.sp.bm.volatility);
+            fd.set('dt', this.sp.bm.dt);
+            fd.set('steps', this.sp.bm.steps);
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                this.sp.bm.paths = [data.path];
+                this.updateSpBmChart();
+            } catch (e) { console.error('spGenerateBrownian', e); }
+        },
+
+        async spAddBrownianPath() {
+            if (this.sp.bm.paths.length >= 10) return;
+            const form = document.getElementById('frmBrownianMotion');
+            const fd = new FormData(form);
+            fd.set('drift', this.sp.bm.drift);
+            fd.set('volatility', this.sp.bm.volatility);
+            fd.set('dt', this.sp.bm.dt);
+            fd.set('steps', this.sp.bm.steps);
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                this.sp.bm.paths.push(data.path);
+                this.updateSpBmChart();
+            } catch (e) { console.error('spAddBrownianPath', e); }
+        },
+
+        spResetBrownian() {
+            this.sp.bm.paths = [];
+            if (spBmChart) { spBmChart.destroy(); spBmChart = null; }
+        },
+
+        updateSpBmChart() {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('spBmChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                if (spBmChart) spBmChart.destroy();
+
+                const datasets = this.sp.bm.paths.map((path, idx) => ({
+                    label: 'Path ' + (idx + 1),
+                    data: path.map(p => ({ x: p.time, y: p.value })),
+                    borderColor: PATH_COLORS[idx % PATH_COLORS.length],
+                    backgroundColor: 'transparent',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0,
+                }));
+
+                // Add a zero-line (drift=0 reference)
+                if (this.sp.bm.paths.length > 0) {
+                    const first = this.sp.bm.paths[0];
+                    const tMax = first[first.length - 1].time;
+                    datasets.push({
+                        label: 'X = 0',
+                        data: [{ x: 0, y: 0 }, { x: tMax, y: 0 }],
+                        borderColor: 'rgba(150,150,150,0.4)',
+                        borderDash: [6, 4],
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: false,
+                    });
+
+                    // Add expected drift line E[X(t)] = μt
+                    if (Math.abs(this.sp.bm.drift) > 0.001) {
+                        datasets.push({
+                            label: 'E[X] = μt',
+                            data: [{ x: 0, y: 0 }, { x: tMax, y: this.sp.bm.drift * tMax }],
+                            borderColor: 'rgba(231,76,60,0.5)',
+                            borderDash: [4, 4],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            fill: false,
+                        });
+                    }
+                }
+
+                spBmChart = new Chart(canvas.getContext('2d'), {
+                    type: 'scatter',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        showLine: true,
+                        plugins: {
+                            legend: { labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } },
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                title: { display: true, text: 'Time', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)', maxTicksLimit: 10 },
+                                grid: { color: 'var(--tc-border)' },
+                            },
+                            y: {
+                                title: { display: true, text: 'X(t)', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { color: 'var(--tc-border)' },
+                            },
+                        },
+                    },
+                });
+            });
+        },
+
+        // ═══════════════════════════════════════════════════════════
+        //  Stochastic Processes — Poisson Process
+        // ═══════════════════════════════════════════════════════════
+
+        async spGeneratePoisson() {
+            const form = document.getElementById('frmPoissonProcess');
+            const fd = new FormData(form);
+            fd.set('lambda', this.sp.pp.lambda);
+            fd.set('duration', this.sp.pp.duration);
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                this.sp.pp.result = data;
+                this.updateSpPpStepChart(data);
+                this.updateSpPpHistChart(data);
+            } catch (e) { console.error('spGeneratePoisson', e); }
+        },
+
+        spResetPoisson() {
+            this.sp.pp.result = null;
+            if (spPpStepChart) { spPpStepChart.destroy(); spPpStepChart = null; }
+            if (spPpHistChart) { spPpHistChart.destroy(); spPpHistChart = null; }
+        },
+
+        updateSpPpStepChart(data) {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('spPpStepChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                if (spPpStepChart) spPpStepChart.destroy();
+
+                // Build step-function data: start at (0,0), then at each arrival time count increases by 1
+                const stepData = [{ x: 0, y: 0 }];
+                for (let i = 0; i < data.arrivalTimes.length; i++) {
+                    // Horizontal line to just before the arrival
+                    stepData.push({ x: data.arrivalTimes[i], y: i });
+                    // Vertical jump
+                    stepData.push({ x: data.arrivalTimes[i], y: i + 1 });
+                }
+                // Extend to end of duration
+                stepData.push({ x: data.duration, y: data.arrivalTimes.length });
+
+                // Expected rate line: N(t) = λt
+                const expectedLine = [
+                    { x: 0, y: 0 },
+                    { x: data.duration, y: data.lambda * data.duration }
+                ];
+
+                spPpStepChart = new Chart(canvas.getContext('2d'), {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'N(t) — cumulative events',
+                                data: stepData,
+                                borderColor: 'rgba(79,110,247,1)',
+                                backgroundColor: 'transparent',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                showLine: true,
+                                tension: 0,
+                            },
+                            {
+                                label: 'E[N(t)] = λt',
+                                data: expectedLine,
+                                borderColor: 'rgba(231,76,60,0.6)',
+                                borderDash: [6, 4],
+                                borderWidth: 1.5,
+                                pointRadius: 0,
+                                fill: false,
+                                showLine: true,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: {
+                            legend: { labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } },
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                min: 0,
+                                max: data.duration,
+                                title: { display: true, text: 'Time', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)', maxTicksLimit: 10 },
+                                grid: { color: 'var(--tc-border)' },
+                            },
+                            y: {
+                                min: 0,
+                                title: { display: true, text: 'Events N(t)', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { color: 'var(--tc-border)' },
+                            },
+                        },
+                    },
+                });
+            });
+        },
+
+        updateSpPpHistChart(data) {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('spPpHistChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                if (spPpHistChart) spPpHistChart.destroy();
+
+                const iats = data.interArrivalTimes;
+                if (!iats || iats.length === 0) return;
+
+                // Build histogram bins
+                const maxIat = Math.max(...iats);
+                const binCount = Math.min(30, Math.max(10, Math.ceil(Math.sqrt(iats.length))));
+                const binWidth = maxIat / binCount;
+                const bins = new Array(binCount).fill(0);
+                for (const t of iats) {
+                    let idx = Math.floor(t / binWidth);
+                    if (idx >= binCount) idx = binCount - 1;
+                    bins[idx]++;
+                }
+
+                // Normalize to density (area = 1)
+                const density = bins.map(c => c / (iats.length * binWidth));
+                const binLabels = bins.map((_, i) => ((i + 0.5) * binWidth).toFixed(3));
+
+                // Theoretical Exponential PDF: f(t) = λ * e^(-λt)
+                const lam = data.lambda;
+                const expPdf = bins.map((_, i) => {
+                    const t = (i + 0.5) * binWidth;
+                    return lam * Math.exp(-lam * t);
+                });
+
+                spPpHistChart = new Chart(canvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: binLabels,
+                        datasets: [
+                            {
+                                label: 'Inter-arrival density',
+                                data: density,
+                                backgroundColor: 'rgba(79,110,247,0.5)',
+                                borderColor: 'rgba(79,110,247,0.8)',
+                                borderWidth: 1,
+                            },
+                            {
+                                label: 'Exp(λ) PDF',
+                                data: expPdf,
+                                type: 'line',
+                                borderColor: 'rgba(230,126,34,1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.3,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: {
+                            legend: { labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } },
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Inter-arrival time', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)', maxTicksLimit: 10 },
+                                grid: { display: false },
+                            },
+                            y: {
+                                min: 0,
+                                title: { display: true, text: 'Density', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { color: 'var(--tc-border)' },
+                            },
+                        },
+                    },
+                });
+            });
+        },
+    };
+}
+</script>

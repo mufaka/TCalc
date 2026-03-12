@@ -15,6 +15,7 @@ public class StatisticsModel : PageModel
     private readonly IRegressionService _regression;
     private readonly IProbabilityService _probability;
     private readonly IDataSetService _dataSetService;
+    private readonly ITimeSeriesService _timeSeries;
     private readonly IConfiguration _config;
 
     public StatisticsModel(
@@ -22,12 +23,14 @@ public class StatisticsModel : PageModel
         IRegressionService regression,
         IProbabilityService probability,
         IDataSetService dataSetService,
+        ITimeSeriesService timeSeries,
         IConfiguration config)
     {
         _stats = stats;
         _regression = regression;
         _probability = probability;
         _dataSetService = dataSetService;
+        _timeSeries = timeSeries;
         _config = config;
     }
 
@@ -393,5 +396,200 @@ public class StatisticsModel : PageModel
                 values.Add(v);
         }
         return values.Count > 0 ? [.. values] : null;
+    }
+
+    // ── Time Series ─────────────────────────────────────────────────
+
+    public IActionResult OnPostDecompose(
+        [FromForm] string data,
+        [FromForm] int seasonalPeriod)
+    {
+        double[]? values = ParseData(data);
+        if (values is null || values.Length == 0)
+            return new JsonResult(new { error = "Enter time series data." });
+
+        var result = _timeSeries.Decompose(values, seasonalPeriod);
+        if (!result.Success) return new JsonResult(new { error = result.Error });
+
+        return new JsonResult(new
+        {
+            original = result.Original,
+            trend = result.Trend,
+            seasonal = result.Seasonal,
+            residual = result.Residual,
+            seasonalPeriod = result.SeasonalPeriod,
+        });
+    }
+
+    public IActionResult OnPostAutocorrelation(
+        [FromForm] string data,
+        [FromForm] int maxLag)
+    {
+        double[]? values = ParseData(data);
+        if (values is null || values.Length == 0)
+            return new JsonResult(new { error = "Enter time series data." });
+
+        var result = _timeSeries.Autocorrelation(values, maxLag);
+        if (!result.Success) return new JsonResult(new { error = result.Error });
+
+        return new JsonResult(new
+        {
+            lags = result.Lags,
+            values = result.Values,
+            significanceBand = result.SignificanceBand,
+        });
+    }
+
+    public IActionResult OnPostForecast(
+        [FromForm] string data,
+        [FromForm] int horizon,
+        [FromForm] double alpha)
+    {
+        double[]? values = ParseData(data);
+        if (values is null || values.Length == 0)
+            return new JsonResult(new { error = "Enter time series data." });
+
+        var result = _timeSeries.ForecastSimple(values, horizon, alpha);
+        if (!result.Success) return new JsonResult(new { error = result.Error });
+
+        return new JsonResult(new
+        {
+            historical = result.Historical,
+            forecast = result.Forecast,
+            upperBound = result.UpperBound,
+            lowerBound = result.LowerBound,
+            result.Alpha,
+        });
+    }
+
+    // ── PCA ─────────────────────────────────────────────────────────
+
+    public IActionResult OnPostPca(
+        [FromForm] string dataX,
+        [FromForm] string dataY)
+    {
+        double[]? xVals = ParseData(dataX);
+        double[]? yVals = ParseData(dataY);
+
+        if (xVals is null || yVals is null || xVals.Length == 0 || yVals.Length == 0)
+            return new JsonResult(new { error = "Provide both X and Y data." });
+
+        if (xVals.Length != yVals.Length)
+            return new JsonResult(new { error = $"X has {xVals.Length} values but Y has {yVals.Length}." });
+
+        var result = _timeSeries.Pca2D(xVals, yVals);
+        if (!result.Success) return new JsonResult(new { error = result.Error });
+
+        return new JsonResult(new
+        {
+            result.MeanX,
+            result.MeanY,
+            pc1X = result.Pc1X,
+            pc1Y = result.Pc1Y,
+            pc2X = result.Pc2X,
+            pc2Y = result.Pc2Y,
+            result.Eigenvalue1,
+            result.Eigenvalue2,
+            result.ExplainedVariance1,
+            result.ExplainedVariance2,
+            projectedX = result.ProjectedX,
+            projectedY = result.ProjectedY,
+            originalX = xVals,
+            originalY = yVals,
+        });
+    }
+
+    // ── Multiple Linear Regression ──────────────────────────────────
+
+    public IActionResult OnPostMultipleRegression(
+        [FromForm] string columnsJson,
+        [FromForm] string dataY)
+    {
+        double[]? yVals = ParseData(dataY);
+        if (yVals is null || yVals.Length == 0)
+            return new JsonResult(new { error = "Y data is required." });
+
+        double[][]? xMatrix;
+        try
+        {
+            xMatrix = JsonSerializer.Deserialize<double[][]>(columnsJson);
+        }
+        catch
+        {
+            return new JsonResult(new { error = "Invalid predictor data format." });
+        }
+
+        if (xMatrix is null || xMatrix.Length == 0)
+            return new JsonResult(new { error = "Predictor data is required." });
+
+        // xMatrix comes as columns — transpose to rows
+        int numPredictors = xMatrix.Length;
+        int numObs = xMatrix[0].Length;
+        if (numObs != yVals.Length)
+            return new JsonResult(new { error = $"Predictor columns have {numObs} values but Y has {yVals.Length}." });
+
+        var rows = new double[numObs][];
+        for (int i = 0; i < numObs; i++)
+        {
+            rows[i] = new double[numPredictors];
+            for (int j = 0; j < numPredictors; j++)
+                rows[i][j] = xMatrix[j][i];
+        }
+
+        var result = _regression.MultipleLinearRegression(rows, yVals);
+        if (!result.Success) return new JsonResult(new { error = result.Error });
+
+        return new JsonResult(new
+        {
+            result.Equation,
+            result.RSquared,
+            result.AdjustedRSquared,
+            result.Coefficients,
+            result.StandardErrors,
+            result.TStatistics,
+            result.FittedValues,
+            result.Residuals,
+        });
+    }
+
+    // ── Logistic Regression ─────────────────────────────────────────
+
+    public IActionResult OnPostLogisticRegression(
+        [FromForm] string dataX,
+        [FromForm] string dataY)
+    {
+        double[]? xVals = ParseData(dataX);
+        if (xVals is null || xVals.Length == 0)
+            return new JsonResult(new { error = "X data is required." });
+
+        bool[]? yVals;
+        try
+        {
+            var rawY = ParseData(dataY);
+            if (rawY is null || rawY.Length == 0)
+                return new JsonResult(new { error = "Y data is required." });
+            yVals = rawY.Select(v => v >= 0.5).ToArray();
+        }
+        catch
+        {
+            return new JsonResult(new { error = "Invalid Y data." });
+        }
+
+        if (xVals.Length != yVals.Length)
+            return new JsonResult(new { error = $"X has {xVals.Length} values but Y has {yVals.Length}." });
+
+        var result = _regression.LogisticRegression(xVals, yVals);
+        if (!result.Success) return new JsonResult(new { error = result.Error });
+
+        return new JsonResult(new
+        {
+            result.Beta0,
+            result.Beta1,
+            result.Accuracy,
+            result.PredictedProbabilities,
+            sigmoidCurve = result.SigmoidCurve.Select(p => new { p.X, p.Y }),
+            scatterX = xVals,
+            scatterY = yVals.Select(b => b ? 1.0 : 0.0),
+        });
     }
 }

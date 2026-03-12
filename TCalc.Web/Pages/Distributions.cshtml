@@ -1,0 +1,2567 @@
+﻿@page
+@model TCalc.Web.Pages.DistributionsModel
+@{
+    ViewData["Title"] = "Distributions";
+}
+
+<div x-data="distributionsApp()" x-cloak>
+
+    <!-- ─── Header ─── -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+        <div>
+            <h1 class="calc-title mb-0">📊 Distributions</h1>
+            <p class="text-muted mb-0" style="font-size:.9rem;">
+                Distribution tables, named distributions, shape metrics, and fundamental theorems
+            </p>
+        </div>
+    </div>
+
+    <!-- ─── Section Tabs ─── -->
+    <div class="prob-type-selector mb-4">
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'table' && 'active'"
+                @@click="tab = 'table'; $nextTick(() => initDistChart())">Distribution Table</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'joint' && 'active'"
+                @@click="tab = 'joint'; $nextTick(() => initJointChart())">Joint Probability</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'named' && 'active'"
+                @@click="tab = 'named'">Named Distributions</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'clt' && 'active'"
+                @@click="tab = 'clt'">Central Limit Theorem</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'shape' && 'active'"
+                @@click="tab = 'shape'">Shape Metrics</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'chebyshev' && 'active'"
+                @@click="tab = 'chebyshev'">Chebyshev's Inequality</button>
+        <button type="button" class="prob-type-btn"
+                :class="tab === 'entropy' && 'active'"
+                @@click="tab = 'entropy'">Entropy</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 1 — Probability Distribution Table
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'table'" x-transition>
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="calc-container">
+                    <h2 class="calc-title">Probability Distribution Table</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Enter outcomes and their probabilities. A valid distribution requires each P between 0 and 1
+                        and all probabilities summing to exactly 1.
+                    </p>
+
+                    <!-- Preset loader -->
+                    <div class="mb-3">
+                        <label class="form-label">Load preset</label>
+                        <select class="form-select form-select-sm" @@change="loadPreset($event.target.value); $event.target.value = ''">
+                            <option value="">— choose —</option>
+                            <option value="coin">Fair Coin</option>
+                            <option value="die">Fair Die (6-sided)</option>
+                            <option value="loaded">Loaded Die</option>
+                            <option value="weather">Weather Forecast</option>
+                        </select>
+                    </div>
+
+                    <!-- Distribution table -->
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm align-middle mb-0 prob-dist-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;">#</th>
+                                    <th>Outcome (x)</th>
+                                    <th style="width:140px;">P(x)</th>
+                                    <th style="width:40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(row, i) in tbl.rows" :key="i">
+                                    <tr>
+                                        <td class="text-muted" x-text="i + 1" style="font-size:.82rem;"></td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm"
+                                                   placeholder="e.g. Heads"
+                                                   x-model="row.outcome"
+                                                   @@input="validateTable()" />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm"
+                                                   min="0" max="1" step="0.01" placeholder="0.5"
+                                                   x-model.number="row.probability"
+                                                   @@input="validateTable()"
+                                                   :class="row.probability != null && (row.probability < 0 || row.probability > 1) ? 'is-invalid' : ''" />
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-danger px-2 py-0"
+                                                    @@click="removeTableRow(i)"
+                                                    :disabled="tbl.rows.length <= 1"
+                                                    title="Remove row">&times;</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td></td>
+                                    <td class="fw-bold text-end" style="font-size:.85rem;">ΣP(x) =</td>
+                                    <td>
+                                        <span class="fw-bold" style="font-size:.9rem;"
+                                              :class="tbl.sumClass"
+                                              x-text="tbl.sum != null ? fmt(tbl.sum) : '—'"></span>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <button type="button" class="btn btn-outline-primary btn-sm w-100 mb-3"
+                            @@click="addTableRow()">+ Add Outcome</button>
+
+                    <!-- Validation messages -->
+                    <template x-if="tbl.errors.length > 0">
+                        <div class="mb-3">
+                            <template x-for="(err, i) in tbl.errors" :key="i">
+                                <div class="text-danger mb-1" style="font-size:.83rem;">
+                                    <span>⚠</span> <span x-text="err"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template x-if="tbl.valid">
+                        <div class="text-success mb-3" style="font-size:.85rem;">
+                            ✓ Valid probability distribution
+                        </div>
+                    </template>
+
+                    <!-- Computed statistics (only if valid) -->
+                    <template x-if="tbl.valid && tbl.stats">
+                        <div class="prob-result-card">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">Number of outcomes</span>
+                                <span class="prob-stat-value" x-text="tbl.rows.length"></span>
+                            </div>
+                            <template x-if="tbl.stats.hasNumeric">
+                                <div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">Expected Value E(X)</span>
+                                        <span class="prob-stat-value" x-text="fmt(tbl.stats.expectedValue)"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">Variance Var(X)</span>
+                                        <span class="prob-stat-value" x-text="fmt(tbl.stats.variance)"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">Std Deviation σ</span>
+                                        <span class="prob-stat-value" x-text="fmt(tbl.stats.stdDev)"></span>
+                                    </div>
+                                </div>
+                            </template>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">Most likely outcome</span>
+                                <span class="prob-stat-value" x-text="tbl.stats.mode"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">Least likely outcome</span>
+                                <span class="prob-stat-value" x-text="tbl.stats.least"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Bar chart visualisation -->
+            <div class="col-lg-6">
+                <div class="calc-container">
+                    <h2 class="calc-title">Distribution Chart</h2>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        Bar heights represent each outcome's probability. The dashed line marks a uniform distribution (1/n).
+                    </p>
+                    <div class="prob-chart-container">
+                        <canvas id="distChart"></canvas>
+                    </div>
+
+                    <!-- Visual probability blocks -->
+                    <template x-if="tbl.valid">
+                        <div class="mt-3">
+                            <p class="text-muted mb-2" style="font-size:.82rem;">Relative likelihood (100 blocks):</p>
+                            <div class="d-flex flex-wrap gap-1">
+                                <template x-for="(blk, i) in tbl.blocks" :key="i">
+                                    <div class="prob-sample-cell prob-sample-hit"
+                                         :style="'background-color:' + blk.color"
+                                         :title="blk.outcome + ' — P=' + fmt(blk.probability)">
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <template x-for="(row, i) in tbl.rows" :key="'legend-'+i">
+                                    <span style="font-size:.78rem;" class="d-inline-flex align-items-center gap-1">
+                                        <span class="prob-sample-cell prob-sample-hit"
+                                              :style="'background-color:' + getDistColor(i)"
+                                              style="width:12px;height:12px;"></span>
+                                        <span x-text="row.outcome || ('Outcome ' + (i+1))"></span>
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 2 — Joint Probability
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'joint'" x-transition>
+        <div class="row g-4">
+            <!-- Left column: table entry -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Joint Probability Table</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Enter joint probabilities P(A∩B) for every combination of Event A (rows) and Event B (columns).
+                        All cells must be between 0 and 1, and the grand total must equal 1.
+                    </p>
+
+                    <!-- Preset loader -->
+                    <div class="mb-3">
+                        <label class="form-label">Load preset</label>
+                        <select class="form-select form-select-sm" @@change="loadJointPreset($event.target.value); $event.target.value = ''">
+                            <option value="">— choose —</option>
+                            <option value="gender_sport">Gender × Sport Preference</option>
+                            <option value="weather_commute">Weather × Commute Mode</option>
+                            <option value="dice_independent">Two Dice (Independent)</option>
+                            <option value="grade_study">Grade × Study Hours</option>
+                        </select>
+                    </div>
+
+                    <!-- Row/column controls -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <div class="d-flex align-items-center gap-1">
+                            <span style="font-size:.82rem;" class="text-muted">Event A (rows):</span>
+                            <button type="button" class="btn btn-outline-primary btn-sm px-2 py-0" @@click="addJointRow()" title="Add row">+</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm px-2 py-0" @@click="removeJointRow()" :disabled="jt.rowLabels.length <= 1" title="Remove last row">−</button>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <span style="font-size:.82rem;" class="text-muted">Event B (cols):</span>
+                            <button type="button" class="btn btn-outline-primary btn-sm px-2 py-0" @@click="addJointCol()" title="Add column">+</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm px-2 py-0" @@click="removeJointCol()" :disabled="jt.colLabels.length <= 1" title="Remove last column">−</button>
+                        </div>
+                    </div>
+
+                    <!-- Joint probability table -->
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm align-middle mb-0 prob-dist-table prob-joint-table">
+                            <thead>
+                                <tr>
+                                    <th class="prob-joint-corner">A ╲ B</th>
+                                    <template x-for="(cl, j) in jt.colLabels" :key="'ch-'+j">
+                                        <th>
+                                            <input type="text" class="form-control form-control-sm text-center prob-joint-label"
+                                                   :placeholder="'B'+(j+1)"
+                                                   x-model="jt.colLabels[j]"
+                                                   @@input="validateJoint()" />
+                                        </th>
+                                    </template>
+                                    <th class="prob-joint-marginal-hdr">P(A)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(rl, i) in jt.rowLabels" :key="'r-'+i">
+                                    <tr>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm prob-joint-label"
+                                                   :placeholder="'A'+(i+1)"
+                                                   x-model="jt.rowLabels[i]"
+                                                   @@input="validateJoint()" />
+                                        </td>
+                                        <template x-for="(cl, j) in jt.colLabels" :key="'c-'+i+'-'+j">
+                                            <td>
+                                                <input type="number" class="form-control form-control-sm text-center"
+                                                       min="0" max="1" step="0.01" placeholder="0"
+                                                       x-model.number="jt.cells[i][j]"
+                                                       @@input="validateJoint()"
+                                                       @@focus="jt.selRow = i; jt.selCol = j"
+                                                       :class="jt.cells[i][j] != null && (jt.cells[i][j] < 0 || jt.cells[i][j] > 1) ? 'is-invalid' : (jt.selRow === i && jt.selCol === j ? 'prob-joint-selected' : '')" />
+                                            </td>
+                                        </template>
+                                        <td class="prob-joint-marginal" x-text="jt.rowMarginals[i] != null ? fmt(jt.rowMarginals[i]) : '—'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td class="prob-joint-marginal-hdr fw-bold" style="font-size:.82rem;">P(B)</td>
+                                    <template x-for="(cl, j) in jt.colLabels" :key="'cf-'+j">
+                                        <td class="prob-joint-marginal" x-text="jt.colMarginals[j] != null ? fmt(jt.colMarginals[j]) : '—'"></td>
+                                    </template>
+                                    <td class="prob-joint-grand"
+                                        :class="jt.grandTotal != null && Math.abs(jt.grandTotal - 1) <= 0.0001 ? 'text-success' : 'text-danger'"
+                                        x-text="jt.grandTotal != null ? fmt(jt.grandTotal) : '—'"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Validation messages -->
+                    <template x-if="jt.errors.length > 0">
+                        <div class="mb-3">
+                            <template x-for="(err, i) in jt.errors" :key="'je-'+i">
+                                <div class="text-danger mb-1" style="font-size:.83rem;">
+                                    <span>⚠</span> <span x-text="err"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template x-if="jt.valid">
+                        <div class="text-success mb-3" style="font-size:.85rem;">
+                            ✓ Valid joint probability distribution
+                        </div>
+                    </template>
+
+                    <!-- Selected cell detail -->
+                    <template x-if="jt.valid && jt.selRow != null && jt.selCol != null">
+                        <div class="prob-result-card mb-3">
+                            <h3 class="calc-subtitle mb-2" style="font-size:.9rem;">
+                                Selected cell: <strong x-text="(jt.rowLabels[jt.selRow] || 'A'+(jt.selRow+1)) + ' ∩ ' + (jt.colLabels[jt.selCol] || 'B'+(jt.selCol+1))"></strong>
+                            </h3>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label" x-text="'P(' + (jt.rowLabels[jt.selRow]||'A'+(jt.selRow+1)) + ' ∩ ' + (jt.colLabels[jt.selCol]||'B'+(jt.selCol+1)) + ')'"></span>
+                                <span class="prob-stat-value" x-text="fmt(jt.cells[jt.selRow][jt.selCol])"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label" x-text="'P(' + (jt.rowLabels[jt.selRow]||'A'+(jt.selRow+1)) + ' | ' + (jt.colLabels[jt.selCol]||'B'+(jt.selCol+1)) + ')'"></span>
+                                <span class="prob-stat-value" x-text="jt.colMarginals[jt.selCol] > 0 ? fmt(jt.cells[jt.selRow][jt.selCol] / jt.colMarginals[jt.selCol]) : '—'"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label" x-text="'P(' + (jt.colLabels[jt.selCol]||'B'+(jt.selCol+1)) + ' | ' + (jt.rowLabels[jt.selRow]||'A'+(jt.selRow+1)) + ')'"></span>
+                                <span class="prob-stat-value" x-text="jt.rowMarginals[jt.selRow] > 0 ? fmt(jt.cells[jt.selRow][jt.selCol] / jt.rowMarginals[jt.selRow]) : '—'"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">P(A)·P(B) (if independent)</span>
+                                <span class="prob-stat-value" x-text="fmt(jt.rowMarginals[jt.selRow] * jt.colMarginals[jt.selCol])"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Independence test -->
+                    <template x-if="jt.valid">
+                        <div class="prob-result-card">
+                            <h3 class="calc-subtitle mb-2" style="font-size:.9rem;">Independence Test</h3>
+                            <p class="text-muted mb-2" style="font-size:.82rem;">
+                                Events are independent if P(A∩B) = P(A)·P(B) for <em>every</em> cell.
+                            </p>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="fw-bold" style="font-size:.9rem;"
+                                      :class="jt.independent ? 'text-success' : 'text-warning'"
+                                      x-text="jt.independent ? '✓ Events appear independent' : '✗ Events are NOT independent'"></span>
+                            </div>
+                            <div class="text-muted" style="font-size:.8rem;" x-show="!jt.independent">
+                                Max deviation: <span x-text="fmt(jt.maxDeviation)"></span>
+                                — at cell <span x-text="jt.maxDeviationCell"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Right column: heatmap + marginal charts -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Joint Distribution Heatmap</h2>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        Cell colour intensity reflects probability magnitude. Click a cell in the table to see conditional probabilities.
+                    </p>
+
+                    <!-- SVG heatmap -->
+                    <div class="prob-joint-heatmap-wrap mb-3">
+                        <svg :viewBox="'0 0 ' + (jt.colLabels.length * 70 + 100) + ' ' + (jt.rowLabels.length * 50 + 80)"
+                             class="prob-joint-heatmap" preserveAspectRatio="xMidYMid meet">
+                            <!-- Column headers -->
+                            <template x-for="(cl, j) in jt.colLabels" :key="'hc-'+j">
+                                <text :x="80 + j * 70 + 35" y="18" text-anchor="middle"
+                                      style="font-size:12px; fill: var(--tc-text-muted);"
+                                      x-text="cl || ('B'+(j+1))"></text>
+                            </template>
+                            <!-- Row headers -->
+                            <template x-for="(rl, i) in jt.rowLabels" :key="'hr-'+i">
+                                <text x="72" :y="48 + i * 50 + 25" text-anchor="end"
+                                      style="font-size:12px; fill: var(--tc-text-muted);"
+                                      x-text="rl || ('A'+(i+1))"></text>
+                            </template>
+                            <!-- Cells -->
+                            <template x-for="(rl, i) in jt.rowLabels" :key="'hri-'+i">
+                                <template x-for="(cl, j) in jt.colLabels" :key="'hcj-'+i+'-'+j">
+                                    <g>
+                                        <rect :x="80 + j * 70" :y="28 + i * 50"
+                                              width="66" height="44" rx="4"
+                                              :fill="getHeatColor(jt.cells[i] ? jt.cells[i][j] : 0)"
+                                              :stroke="jt.selRow === i && jt.selCol === j ? 'var(--tc-accent)' : 'var(--tc-border)'"
+                                              :stroke-width="jt.selRow === i && jt.selCol === j ? 2.5 : 1"
+                                              style="cursor:pointer;"
+                                              @@click="jt.selRow = i; jt.selCol = j" />
+                                        <text :x="80 + j * 70 + 33" :y="28 + i * 50 + 27"
+                                              text-anchor="middle" style="font-size:11px; fill: var(--tc-text); pointer-events:none;"
+                                              x-text="jt.cells[i] && jt.cells[i][j] != null ? fmt(jt.cells[i][j]) : ''"></text>
+                                    </g>
+                                </template>
+                            </template>
+                            <!-- Row marginals -->
+                            <template x-for="(rl, i) in jt.rowLabels" :key="'hm-'+i">
+                                <text :x="80 + jt.colLabels.length * 70 + 10" :y="48 + i * 50 + 25"
+                                      text-anchor="start"
+                                      style="font-size:10px; fill: var(--tc-text-muted); font-style: italic;"
+                                      x-text="jt.rowMarginals[i] != null ? fmt(jt.rowMarginals[i]) : ''"></text>
+                            </template>
+                            <!-- Column marginals -->
+                            <template x-for="(cl, j) in jt.colLabels" :key="'hcm-'+j">
+                                <text :x="80 + j * 70 + 33" :y="28 + jt.rowLabels.length * 50 + 16"
+                                      text-anchor="middle"
+                                      style="font-size:10px; fill: var(--tc-text-muted); font-style: italic;"
+                                      x-text="jt.colMarginals[j] != null ? fmt(jt.colMarginals[j]) : ''"></text>
+                            </template>
+                        </svg>
+                    </div>
+
+                    <!-- Marginal distribution bar chart -->
+                    <h3 class="calc-subtitle mb-2" style="font-size:.88rem;">Marginal Distributions</h3>
+                    <div class="prob-chart-container" style="height:220px;">
+                        <canvas id="jointMarginalChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 3 — Named Distributions
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'named'" x-transition>
+        <!-- Hidden form for HTMX POST -->
+        <form id="dist-form-prob" method="post" asp-page-handler="Probability" style="display:none"></form>
+
+        <!-- Distribution selector -->
+        <div class="prob-type-selector mb-4">
+            <button type="button" class="prob-type-btn"
+                    :class="nd.dist === 'normal' && 'active'"
+                    @@click="nd.dist = 'normal'; computeNamedDist()">Normal</button>
+            <button type="button" class="prob-type-btn"
+                    :class="nd.dist === 'binomial' && 'active'"
+                    @@click="nd.dist = 'binomial'; computeNamedDist()">Binomial</button>
+            <button type="button" class="prob-type-btn"
+                    :class="nd.dist === 'poisson' && 'active'"
+                    @@click="nd.dist = 'poisson'; computeNamedDist()">Poisson</button>
+        </div>
+
+        <div class="row g-4">
+            <!-- Left column: parameters & results -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title" x-text="nd.dist === 'normal' ? 'Normal Distribution' : nd.dist === 'binomial' ? 'Binomial Distribution' : 'Poisson Distribution'"></h2>
+
+                    <!-- Normal parameters -->
+                    <div x-show="nd.dist === 'normal'">
+                        <div class="mb-3">
+                            <label class="form-label">Mean (μ): <strong x-text="nd.mean"></strong></label>
+                            <input type="range" class="form-range" min="-10" max="10" step="0.1"
+                                   x-model.number="nd.mean" @@input="computeNamedDist()" />
+                            <div class="d-flex justify-content-between text-muted" style="font-size:.75rem;">
+                                <span>-10</span><span>0</span><span>10</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Std Dev (σ): <strong x-text="nd.stdDev"></strong></label>
+                            <input type="range" class="form-range" min="0.1" max="5" step="0.1"
+                                   x-model.number="nd.stdDev" @@input="computeNamedDist()" />
+                            <div class="d-flex justify-content-between text-muted" style="font-size:.75rem;">
+                                <span>0.1</span><span>2.5</span><span>5</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Query value (x) <span class="text-muted" style="font-size:.8rem;">— optional</span></label>
+                            <input type="number" class="form-control form-control-sm" step="0.1"
+                                   x-model.number="nd.x" @@change="computeNamedDist()" placeholder="e.g. 1.5" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Shade P(a ≤ X ≤ b)</label>
+                            <div class="d-flex gap-2">
+                                <input type="number" class="form-control form-control-sm" step="0.1"
+                                       x-model.number="nd.shadeA" @@change="updateNamedChart()" placeholder="a" />
+                                <input type="number" class="form-control form-control-sm" step="0.1"
+                                       x-model.number="nd.shadeB" @@change="updateNamedChart()" placeholder="b" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Binomial parameters -->
+                    <div x-show="nd.dist === 'binomial'">
+                        <div class="mb-3">
+                            <label class="form-label">Trials (n): <strong x-text="nd.n"></strong></label>
+                            <input type="range" class="form-range" min="1" max="100" step="1"
+                                   x-model.number="nd.n" @@input="computeNamedDist()" />
+                            <div class="d-flex justify-content-between text-muted" style="font-size:.75rem;">
+                                <span>1</span><span>50</span><span>100</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Success probability (p): <strong x-text="nd.p"></strong></label>
+                            <input type="range" class="form-range" min="0.01" max="0.99" step="0.01"
+                                   x-model.number="nd.p" @@input="computeNamedDist()" />
+                            <div class="d-flex justify-content-between text-muted" style="font-size:.75rem;">
+                                <span>0.01</span><span>0.5</span><span>0.99</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Query value (k) <span class="text-muted" style="font-size:.8rem;">— optional</span></label>
+                            <input type="number" class="form-control form-control-sm" min="0" :max="nd.n" step="1"
+                                   x-model.number="nd.k" @@change="computeNamedDist()" placeholder="e.g. 5" />
+                        </div>
+                    </div>
+
+                    <!-- Poisson parameters -->
+                    <div x-show="nd.dist === 'poisson'">
+                        <div class="mb-3">
+                            <label class="form-label">Rate (λ): <strong x-text="nd.lambda"></strong></label>
+                            <input type="range" class="form-range" min="0.1" max="20" step="0.1"
+                                   x-model.number="nd.lambda" @@input="computeNamedDist()" />
+                            <div class="d-flex justify-content-between text-muted" style="font-size:.75rem;">
+                                <span>0.1</span><span>10</span><span>20</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Query value (k) <span class="text-muted" style="font-size:.8rem;">— optional</span></label>
+                            <input type="number" class="form-control form-control-sm" min="0" step="1"
+                                   x-model.number="nd.k" @@change="computeNamedDist()" placeholder="e.g. 3" />
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary btn-sm w-100 mb-3"
+                            @@click="computeNamedDist()">Compute</button>
+
+                    <!-- Error display -->
+                    <template x-if="nd.error">
+                        <div class="text-danger mb-3" style="font-size:.83rem;">
+                            <span>⚠</span> <span x-text="nd.error"></span>
+                        </div>
+                    </template>
+
+                    <!-- Results -->
+                    <template x-if="nd.result">
+                        <div class="prob-result-card">
+                            <template x-if="nd.result.type === 'normal'">
+                                <div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">μ (Mean)</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.mean)"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">σ (Std Dev)</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.stdDev)"></span>
+                                    </div>
+                                    <template x-if="nd.result.pdfAtX != null">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="prob-stat-label" x-text="'f(' + nd.result.queriedX + ')'">PDF</span>
+                                            <span class="prob-stat-value" x-text="fmt(nd.result.pdfAtX)"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="nd.result.cdfAtX != null">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="prob-stat-label" x-text="'P(X ≤ ' + nd.result.queriedX + ')'">CDF</span>
+                                            <span class="prob-stat-value" x-text="fmt(nd.result.cdfAtX)"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="nd.result.queriedX != null">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="prob-stat-label">z-score</span>
+                                            <span class="prob-stat-value" x-text="fmt((nd.result.queriedX - nd.result.mean) / nd.result.stdDev)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="nd.result.type === 'binomial'">
+                                <div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">E(X) = np</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.expectedValue)"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">Var(X) = np(1−p)</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.variance)"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">σ</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.stdDev)"></span>
+                                    </div>
+                                    <template x-if="nd.result.pmfAtK != null">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="prob-stat-label" x-text="'P(X = ' + nd.result.queriedK + ')'">PMF</span>
+                                            <span class="prob-stat-value" x-text="fmt(nd.result.pmfAtK)"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="nd.result.cdfAtK != null">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="prob-stat-label" x-text="'P(X ≤ ' + nd.result.queriedK + ')'">CDF</span>
+                                            <span class="prob-stat-value" x-text="fmt(nd.result.cdfAtK)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="nd.result.type === 'poisson'">
+                                <div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">E(X) = λ</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.expectedValue)"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">Var(X) = λ</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.variance)"></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="prob-stat-label">σ</span>
+                                        <span class="prob-stat-value" x-text="fmt(nd.result.stdDev)"></span>
+                                    </div>
+                                    <template x-if="nd.result.pmfAtK != null">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="prob-stat-label" x-text="'P(X = ' + nd.result.queriedK + ')'">PMF</span>
+                                            <span class="prob-stat-value" x-text="fmt(nd.result.pmfAtK)"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="nd.result.cdfAtK != null">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="prob-stat-label" x-text="'P(X ≤ ' + nd.result.queriedK + ')'">CDF</span>
+                                            <span class="prob-stat-value" x-text="fmt(nd.result.cdfAtK)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Teaching callouts -->
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="nd.showLearn = !nd.showLearn">
+                            💡 <span x-text="nd.showLearn ? 'Hide' : 'Learn'"></span>
+                        </button>
+                        <div x-show="nd.showLearn" x-transition class="mt-2 p-3 rounded" style="background:var(--tc-bg-offset);font-size:.85rem;">
+                            <div x-show="nd.dist === 'normal'">
+                                <p class="mb-2"><strong>Normal Distribution</strong> — The "bell curve." Symmetric about μ.</p>
+                                <p class="mb-2">📏 <strong>68-95-99.7 Rule:</strong> ~68% of data falls within ±1σ, ~95% within ±2σ, ~99.7% within ±3σ.</p>
+                                <p class="mb-0">The curve is completely determined by two parameters: mean (μ) and standard deviation (σ).</p>
+                            </div>
+                            <div x-show="nd.dist === 'binomial'">
+                                <p class="mb-2"><strong>Binomial Distribution</strong> — Models the number of successes in n independent trials.</p>
+                                <p class="mb-2">Each trial has the same probability p of success. Think coin flips, defective items, or pass/fail tests.</p>
+                                <p class="mb-0">As n increases (and p isn't too extreme), the Binomial approaches the Normal distribution.</p>
+                            </div>
+                            <div x-show="nd.dist === 'poisson'">
+                                <p class="mb-2"><strong>Poisson Distribution</strong> — Models the count of events in a fixed interval.</p>
+                                <p class="mb-2">λ is both the mean and variance. Used for rare events: customer arrivals, typos per page, calls per hour.</p>
+                                <p class="mb-0">As λ grows, the Poisson shape approaches a Normal distribution.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison mode -->
+                    <div class="mt-3 pt-3" style="border-top:1px solid var(--tc-border);">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="ndCompare"
+                                   x-model="nd.compare" @@change="updateNamedChart()">
+                            <label class="form-check-label" for="ndCompare" style="font-size:.85rem;">
+                                Compare: overlay Normal approximation
+                            </label>
+                        </div>
+                        <p class="text-muted mb-0" style="font-size:.78rem;" x-show="nd.compare">
+                            <span x-show="nd.dist === 'binomial'">Overlays N(np, np(1−p)) — the Normal approximation to the Binomial.</span>
+                            <span x-show="nd.dist === 'poisson'">Overlays N(λ, λ) — the Normal approximation to the Poisson.</span>
+                            <span x-show="nd.dist === 'normal'">Already viewing the Normal distribution.</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column: chart -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Distribution Chart</h2>
+                    <div class="prob-chart-container" style="height:360px;">
+                        <canvas id="namedDistChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 4 — Central Limit Theorem
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'clt'" x-transition>
+        <div class="row g-4">
+            <!-- Left column: population & controls -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Central Limit Theorem Demo</h2>
+                    <p class="text-muted" style="font-size:.85rem;">
+                        Watch the sampling distribution of the mean converge to a Normal curve —
+                        regardless of the population shape.
+                    </p>
+
+                    <!-- Population selector -->
+                    <div class="mb-3">
+                        <label class="form-label">Source population shape</label>
+                        <select class="form-select form-select-sm"
+                                x-model="clt.popType" @@change="cltReset()">
+                            <option value="uniform">Uniform (0–10)</option>
+                            <option value="exponential">Exponential (λ=1)</option>
+                            <option value="bimodal">Bimodal</option>
+                            <option value="rightSkew">Right-skewed</option>
+                            <option value="leftSkew">Left-skewed</option>
+                        </select>
+                    </div>
+
+                    <!-- Sample size slider -->
+                    <div class="mb-3">
+                        <label class="form-label">Sample size (n): <strong x-text="clt.n"></strong></label>
+                        <input type="range" class="form-range" min="0" max="6" step="1"
+                               x-model.number="clt.nIndex" @@input="clt.n = clt.nOptions[clt.nIndex]; cltReset();" />
+                        <div class="d-flex justify-content-between text-muted" style="font-size:.75rem;">
+                            <template x-for="v in clt.nOptions" :key="v">
+                                <span x-text="v"></span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Draw buttons -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" @@click="cltDraw(1)">Draw 1 Sample</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @@click="cltDraw(100)">+100</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @@click="cltDraw(1000)">+1,000</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" @@click="cltReset()">Reset</button>
+                    </div>
+
+                    <!-- Running statistics -->
+                    <div class="prob-result-card">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Samples drawn</span>
+                            <span class="prob-stat-value" x-text="clt.sampleMeans.length"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Mean of sample means (X̿)</span>
+                            <span class="prob-stat-value" x-text="clt.sampleMeans.length > 0 ? fmt(clt.runMean) : '—'"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Std dev of sample means</span>
+                            <span class="prob-stat-value" x-text="clt.sampleMeans.length > 1 ? fmt(clt.runStd) : '—'"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Theoretical σ/√n</span>
+                            <span class="prob-stat-value" x-text="fmt(clt.popStd / Math.sqrt(clt.n))"></span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="prob-stat-label">Population μ</span>
+                            <span class="prob-stat-value" x-text="fmt(clt.popMean)"></span>
+                        </div>
+                    </div>
+
+                    <!-- Teaching annotation -->
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="clt.showLearn = !clt.showLearn">
+                            💡 <span x-text="clt.showLearn ? 'Hide' : 'Learn'"></span>
+                        </button>
+                        <div x-show="clt.showLearn" x-transition class="mt-2 p-3 rounded" style="background:var(--tc-bg-offset);font-size:.85rem;">
+                            <p class="mb-2"><strong>The Central Limit Theorem</strong> states that the distribution of sample means
+                                approaches a Normal distribution as sample size increases — regardless of the population's shape.</p>
+                            <p class="mb-2">📏 The mean of the sampling distribution equals the population mean μ.</p>
+                            <p class="mb-2">📏 The standard deviation of the sampling distribution equals σ/√n (the "standard error").</p>
+                            <p class="mb-0">💡 Notice how even a skewed or bimodal population produces bell-shaped means at n ≥ 30.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column: charts -->
+            <div class="col-lg-7">
+                <div class="calc-container mb-4">
+                    <h3 class="calc-subtitle">Population Distribution</h3>
+                    <div class="prob-chart-container" style="height:200px;">
+                        <canvas id="cltPopChart"></canvas>
+                    </div>
+                </div>
+                <div class="calc-container">
+                    <h3 class="calc-subtitle">Sampling Distribution of the Mean</h3>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        The histogram shows the distribution of sample means.
+                        <span x-show="clt.sampleMeans.length >= 10">The dashed curve is the theoretical Normal N(μ, σ²/n).</span>
+                    </p>
+                    <div class="prob-chart-container" style="height:280px;">
+                        <canvas id="cltMeansChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 5 — Shape Metrics (Skewness & Kurtosis)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'shape'" x-transition>
+        <!-- Hidden form for HTMX POST -->
+        <form id="dist-form-shape" method="post" asp-page-handler="ShapeMetrics" style="display:none"></form>
+
+        <div class="row g-4">
+            <!-- Left column: data input & results -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Skewness &amp; Kurtosis Explorer</h2>
+
+                    <!-- Preset selector -->
+                    <div class="mb-3">
+                        <label class="form-label">Load preset</label>
+                        <select class="form-select form-select-sm" @@change="shapeLoadPreset($event.target.value); $event.target.value = '';">
+                            <option value="">— choose preset —</option>
+                            <option value="normal">Normal (Symmetric)</option>
+                            <option value="rightSkew">Right-skewed</option>
+                            <option value="leftSkew">Left-skewed</option>
+                            <option value="uniform">Uniform</option>
+                            <option value="leptokurtic">Leptokurtic (heavy tails)</option>
+                            <option value="platykurtic">Platykurtic (light tails)</option>
+                        </select>
+                    </div>
+
+                    <!-- Interactive data editor -->
+                    <div class="mb-3">
+                        <label class="form-label">Data values</label>
+                        <textarea class="form-control form-control-sm" rows="4" x-model="shape.rawData"
+                                  placeholder="Enter comma- or space-separated values&#10;e.g. 2, 3, 5, 7, 8, 8, 9, 10, 12"
+                                  @@input="shapeCompute()"></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <button type="button" class="btn btn-primary btn-sm" @@click="shapeCompute()">Compute</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="shape.rawData = ''; shape.result = null; shape.error = ''">Clear</button>
+                    </div>
+
+                    <!-- Error -->
+                    <template x-if="shape.error">
+                        <div class="text-danger mb-3" style="font-size:.83rem;">
+                            <span>⚠</span> <span x-text="shape.error"></span>
+                        </div>
+                    </template>
+
+                    <!-- Results -->
+                    <template x-if="shape.result">
+                        <div class="prob-result-card">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">Skewness</span>
+                                <span class="prob-stat-value">
+                                    <span x-text="fmt(shape.result.skewness)"></span>
+                                    <span class="ms-2 badge"
+                                          :class="shape.result.skewness < -0.1 ? 'bg-warning text-dark' : shape.result.skewness > 0.1 ? 'bg-info text-dark' : 'bg-success'"
+                                          x-text="shape.result.skewness < -0.1 ? 'Left-skewed' : shape.result.skewness > 0.1 ? 'Right-skewed' : 'Symmetric'"></span>
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">Excess Kurtosis</span>
+                                <span class="prob-stat-value">
+                                    <span x-text="fmt(shape.result.kurtosis)"></span>
+                                    <span class="ms-2 badge"
+                                          :class="shape.result.kurtosis < -0.1 ? 'bg-warning text-dark' : shape.result.kurtosis > 0.1 ? 'bg-danger' : 'bg-success'"
+                                          x-text="shape.result.kurtosis < -0.1 ? 'Platykurtic' : shape.result.kurtosis > 0.1 ? 'Leptokurtic' : 'Mesokurtic'"></span>
+                                </span>
+                            </div>
+                            <hr class="my-2" style="border-color:var(--tc-border);">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="prob-stat-label">Mean</span>
+                                <span class="prob-stat-value" x-text="fmt(shape.result.mean)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="prob-stat-label">Median</span>
+                                <span class="prob-stat-value" x-text="fmt(shape.result.median)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="prob-stat-label">Mode</span>
+                                <span class="prob-stat-value" x-text="fmt(shape.result.mode)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">σ (Std Dev)</span>
+                                <span class="prob-stat-value" x-text="fmt(shape.result.stdDev)"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Teaching callout -->
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="shape.showLearn = !shape.showLearn">
+                            💡 <span x-text="shape.showLearn ? 'Hide' : 'Learn'"></span>
+                        </button>
+                        <div x-show="shape.showLearn" x-transition class="mt-2 p-3 rounded" style="background:var(--tc-bg-offset);font-size:.85rem;">
+                            <p class="mb-2"><strong>Skewness</strong> measures asymmetry. Negative = left tail is longer (left-skewed). Positive = right tail is longer (right-skewed). Zero = symmetric.</p>
+                            <p class="mb-2"><strong>Kurtosis</strong> (excess) measures tail weight compared to Normal. Positive (leptokurtic) = heavier tails, more outliers. Negative (platykurtic) = lighter tails, fewer outliers.</p>
+                            <p class="mb-0">💡 For a right-skewed distribution: mean &gt; median &gt; mode. The vertical lines on the chart show how skewness shifts these apart.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column: chart -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Distribution Shape</h2>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        Histogram of your data with vertical lines for mean, median, and mode.
+                        <span x-show="shape.result">The dashed curve is the Normal distribution with the same mean and std dev.</span>
+                    </p>
+                    <div class="prob-chart-container" style="height:340px;">
+                        <canvas id="shapeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 6 — Chebyshev's Inequality
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'chebyshev'" x-transition>
+        <div class="row g-4">
+            <!-- Left column: inputs & results -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Chebyshev's Inequality</h2>
+                    <p class="text-muted mb-3" style="font-size:.85rem;">
+                        For <em>any</em> distribution: P(|X − μ| ≥ kσ) ≤ 1/k²
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Mean (μ)</label>
+                        <input type="number" class="form-control form-control-sm" step="any"
+                               x-model.number="cheb.mean" @@input="chebCompute()" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Std Dev (σ)</label>
+                        <input type="number" class="form-control form-control-sm" step="0.1" min="0.01"
+                               x-model.number="cheb.sigma" @@input="chebCompute()" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of std devs (k): <strong x-text="cheb.k"></strong></label>
+                        <input type="range" class="form-range" min="1.1" max="5" step="0.1"
+                               x-model.number="cheb.k" @@input="chebCompute()" />
+                        <div class="d-flex justify-content-between text-muted" style="font-size:.75rem;">
+                            <span>1.1</span><span>3</span><span>5</span>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="prob-result-card">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Min. within ±kσ</span>
+                            <span class="prob-stat-value" x-text="((1 - 1/(cheb.k * cheb.k)) * 100).toFixed(2) + '%'"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Max. outside ±kσ</span>
+                            <span class="prob-stat-value" x-text="((1/(cheb.k * cheb.k)) * 100).toFixed(2) + '%'"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="prob-stat-label">Range</span>
+                            <span class="prob-stat-value"
+                                  x-text="'[' + (cheb.mean - cheb.k * cheb.sigma).toFixed(2) + ', ' + (cheb.mean + cheb.k * cheb.sigma).toFixed(2) + ']'"></span>
+                        </div>
+                    </div>
+
+                    <!-- Comparison table -->
+                    <div class="mt-3">
+                        <h3 class="calc-subtitle" style="font-size:.88rem;">Chebyshev vs Normal</h3>
+                        <table class="table table-sm" style="font-size:.82rem;">
+                            <thead>
+                                <tr>
+                                    <th>k</th>
+                                    <th>Chebyshev (min %)</th>
+                                    <th>Normal (actual %)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="kv in cheb.compareRows" :key="kv.k">
+                                    <tr :class="Math.abs(kv.k - cheb.k) < 0.05 ? 'table-active' : ''">
+                                        <td x-text="kv.k"></td>
+                                        <td x-text="kv.cheb + '%'"></td>
+                                        <td x-text="kv.normal + '%'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Teaching note -->
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="cheb.showLearn = !cheb.showLearn">
+                            💡 <span x-text="cheb.showLearn ? 'Hide' : 'Learn'"></span>
+                        </button>
+                        <div x-show="cheb.showLearn" x-transition class="mt-2 p-3 rounded" style="background:var(--tc-bg-offset);font-size:.85rem;">
+                            <p class="mb-2"><strong>Chebyshev's Inequality</strong> works for ANY distribution — no normality required. It gives a worst-case guarantee.</p>
+                            <p class="mb-2">Compare the Chebyshev bound with the Normal column: the Normal distribution always does <em>better</em> than the bound. Chebyshev is conservative because it must hold for all possible distribution shapes.</p>
+                            <p class="mb-0">💡 At k=2: Chebyshev guarantees at least 75% within ±2σ, but the Normal actually captures 95.45%.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column: visualization -->
+            <div class="col-lg-7">
+                <div class="calc-container">
+                    <h2 class="calc-title">Visual Representation</h2>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        A generic distribution centered at μ with the ±kσ region shaded.
+                    </p>
+                    <div class="prob-chart-container" style="height:320px;">
+                        <canvas id="chebyshevChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Section 7 — Shannon Entropy
+         ═══════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'entropy'" x-transition>
+        <div class="row g-4">
+            <!-- Left column: inputs & results -->
+            <div class="col-lg-5">
+                <div class="calc-container">
+                    <h2 class="calc-title">Shannon Entropy Calculator</h2>
+
+                    <!-- Distribution input -->
+                    <div class="mb-3">
+                        <label class="form-label">Probability distribution</label>
+                        <template x-for="(p, i) in ent.probs" :key="'ep-'+i">
+                            <div class="d-flex gap-2 mb-2 align-items-center">
+                                <input type="text" class="form-control form-control-sm" style="width:100px;"
+                                       x-model="ent.labels[i]" :placeholder="'Event ' + (i+1)" />
+                                <input type="number" class="form-control form-control-sm" style="width:100px;"
+                                       step="0.01" min="0" max="1"
+                                       x-model.number="ent.probs[i]" @@input="entCompute()" />
+                                <button type="button" class="btn btn-outline-danger btn-sm" style="padding:2px 8px;"
+                                        @@click="ent.probs.splice(i,1); ent.labels.splice(i,1); entCompute()"
+                                        x-show="ent.probs.length > 2">×</button>
+                            </div>
+                        </template>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm"
+                                    @@click="ent.probs.push(0); ent.labels.push(''); entCompute()">+ Add outcome</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    @@click="entMakeUniform()">Make uniform</button>
+                        </div>
+                    </div>
+
+                    <!-- Sum validation -->
+                    <div class="mb-3" style="font-size:.83rem;">
+                        Sum: <span :class="Math.abs(ent.sum - 1) < 0.0001 ? 'text-success fw-bold' : 'text-danger fw-bold'"
+                                   x-text="ent.sum.toFixed(4)"></span>
+                        <span x-show="Math.abs(ent.sum - 1) >= 0.0001" class="text-danger"> (must = 1)</span>
+                    </div>
+
+                    <!-- Presets -->
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:.85rem;">Presets</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    @@click="entLoadPreset('fair_coin')">Fair coin</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    @@click="entLoadPreset('fair_die')">Fair die</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    @@click="entLoadPreset('biased_coin')">Biased coin</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    @@click="entLoadPreset('certain')">Certain</button>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <template x-if="ent.valid">
+                        <div class="prob-result-card">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">H(X) — bits (log₂)</span>
+                                <span class="prob-stat-value fw-bold" x-text="fmt(ent.bits)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">H(X) — nats (ln)</span>
+                                <span class="prob-stat-value" x-text="fmt(ent.nats)"></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">H(X) — bans (log₁₀)</span>
+                                <span class="prob-stat-value" x-text="fmt(ent.bans)"></span>
+                            </div>
+                            <hr class="my-2" style="border-color:var(--tc-border);">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="prob-stat-label">Max entropy (uniform)</span>
+                                <span class="prob-stat-value" x-text="fmt(ent.maxBits) + ' bits'"></span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="prob-stat-label">Efficiency</span>
+                                <span class="prob-stat-value" x-text="ent.maxBits > 0 ? ((ent.bits / ent.maxBits) * 100).toFixed(1) + '%' : '—'"></span>
+                            </div>
+
+                            <!-- Entropy bar gauge -->
+                            <div class="mt-3">
+                                <div class="d-flex justify-content-between mb-1" style="font-size:.78rem;">
+                                    <span>0 (certain)</span>
+                                    <span x-text="fmt(ent.maxBits) + ' (max)'"></span>
+                                </div>
+                                <div class="progress" style="height:20px;">
+                                    <div class="progress-bar" role="progressbar"
+                                         :style="'width:' + (ent.maxBits > 0 ? (ent.bits / ent.maxBits * 100) : 0) + '%'"
+                                         style="background:var(--tc-primary);"
+                                         x-text="fmt(ent.bits) + ' bits'"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Teaching note -->
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                @@click="ent.showLearn = !ent.showLearn">
+                            💡 <span x-text="ent.showLearn ? 'Hide' : 'Learn'"></span>
+                        </button>
+                        <div x-show="ent.showLearn" x-transition class="mt-2 p-3 rounded" style="background:var(--tc-bg-offset);font-size:.85rem;">
+                            <p class="mb-2"><strong>Shannon Entropy</strong> measures surprise or uncertainty. Higher entropy = more unpredictable.</p>
+                            <p class="mb-2">A fair coin (H=1 bit) carries maximum information per flip. A two-headed coin (H=0) carries none.</p>
+                            <p class="mb-0">💡 Entropy is maximized when all outcomes are equally likely (uniform distribution).</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right column: slider experiment & chart -->
+            <div class="col-lg-7">
+                <div class="calc-container mb-4">
+                    <h3 class="calc-subtitle">Interactive: 2-Outcome Entropy Curve</h3>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        Slide P(A) from 0 to 1 and watch entropy rise to 1 bit at P(A)=0.5, then fall.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label">P(A) = <strong x-text="ent.sliderP.toFixed(2)"></strong>,
+                            P(B) = <strong x-text="(1 - ent.sliderP).toFixed(2)"></strong></label>
+                        <input type="range" class="form-range" min="0.01" max="0.99" step="0.01"
+                               x-model.number="ent.sliderP" @@input="updateEntSliderChart()" />
+                    </div>
+                    <div class="prob-chart-container" style="height:200px;">
+                        <canvas id="entropySliderChart"></canvas>
+                    </div>
+                </div>
+                <div class="calc-container">
+                    <h3 class="calc-subtitle">Distribution Entropy Comparison</h3>
+                    <p class="text-muted mb-2" style="font-size:.82rem;">
+                        Your distribution's entropy vs. uniform with the same number of outcomes.
+                    </p>
+                    <div class="prob-chart-container" style="height:200px;">
+                        <canvas id="entropyBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Quick Reference ─── -->
+    <div class="calc-container mt-4">
+        <h2 class="calc-title">📋 Quick Reference</h2>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Distribution</div>
+                    <div class="prob-ref-formula">ΣP(xᵢ) = 1 &nbsp;•&nbsp; E(X) = Σxᵢ·P(xᵢ)</div>
+                    <div class="prob-ref-note">All probabilities must sum to 1</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Joint Probability</div>
+                    <div class="prob-ref-formula">P(A) = Σⱼ P(A∩Bⱼ) &nbsp;•&nbsp; ΣΣP = 1</div>
+                    <div class="prob-ref-note">Independent if P(A∩B) = P(A)·P(B) for all cells</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Chebyshev</div>
+                    <div class="prob-ref-formula">P(|X−μ| ≥ kσ) ≤ 1/k²</div>
+                    <div class="prob-ref-note">Works for any distribution shape</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Entropy</div>
+                    <div class="prob-ref-formula">H(X) = −Σ pᵢ log₂(pᵢ)</div>
+                    <div class="prob-ref-note">Maximum at uniform distribution</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Central Limit Theorem</div>
+                    <div class="prob-ref-formula">X̄ ~ N(μ, σ²/n) as n → ∞</div>
+                    <div class="prob-ref-note">Sample means → Normal regardless of population</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="prob-ref-card">
+                    <div class="prob-ref-title">Variance</div>
+                    <div class="prob-ref-formula">Var(X) = Σ(xᵢ−μ)²·P(xᵢ)</div>
+                    <div class="prob-ref-note">σ = √Var(X)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Cross-page Navigation ─── -->
+    <div class="d-flex justify-content-between mt-4 pt-3" style="border-top:1px solid var(--tc-border);">
+        <a asp-page="/Probability" class="btn btn-outline-secondary">← Probability Rules</a>
+        <a asp-page="/Simulation" class="btn btn-outline-primary">Simulation →</a>
+    </div>
+</div>
+
+<script>
+function distributionsApp() {
+    let distChart = null;
+    let jointChart = null;
+    let namedDistChart = null;
+    let cltPopChart = null;
+    let cltMeansChart = null;
+    let shapeChart = null;
+    let chebyshevChart = null;
+    let entropySliderChart = null;
+    let entropyBarChart = null;
+
+    return {
+        tab: 'table',
+
+        // ── Distribution Table ──
+        tbl: {
+            rows: [
+                { outcome: 'Heads', probability: 0.5 },
+                { outcome: 'Tails', probability: 0.5 }
+            ],
+            sum: 1,
+            sumClass: 'text-success',
+            valid: true,
+            errors: [],
+            stats: null,
+            blocks: []
+        },
+
+        // ── Joint Probability ──
+        jt: {
+            rowLabels: ['Male', 'Female'],
+            colLabels: ['Football', 'Basketball', 'Tennis'],
+            cells: [[0.20, 0.10, 0.15], [0.10, 0.20, 0.25]],
+            rowMarginals: [],
+            colMarginals: [],
+            grandTotal: null,
+            selRow: 0,
+            selCol: 0,
+            valid: false,
+            errors: [],
+            independent: false,
+            maxDeviation: 0,
+            maxDeviationCell: ''
+        },
+
+        // ── Named Distributions ──
+        nd: {
+            dist: 'normal',
+            mean: 0, stdDev: 1, x: null,
+            shadeA: null, shadeB: null,
+            n: 20, p: 0.5, k: null,
+            lambda: 5,
+            result: null,
+            error: '',
+            showLearn: false,
+            compare: false
+        },
+
+        // ── Central Limit Theorem ──
+        clt: {
+            popType: 'uniform',
+            nOptions: [1, 2, 5, 10, 30, 50, 100],
+            nIndex: 2,
+            n: 5,
+            popData: [],
+            popMean: 5,
+            popStd: 2.887,
+            sampleMeans: [],
+            runMean: 0,
+            runStd: 0,
+            showLearn: false
+        },
+
+        // ── Shape Metrics ──
+        shape: {
+            rawData: '',
+            result: null,
+            error: '',
+            showLearn: false
+        },
+
+        // ── Chebyshev's Inequality ──
+        cheb: {
+            mean: 0,
+            sigma: 1,
+            k: 2,
+            showLearn: false,
+            compareRows: [
+                { k: 1, cheb: '0.00', normal: '68.27' },
+                { k: 1.5, cheb: '55.56', normal: '86.64' },
+                { k: 2, cheb: '75.00', normal: '95.45' },
+                { k: 2.5, cheb: '84.00', normal: '98.76' },
+                { k: 3, cheb: '88.89', normal: '99.73' }
+            ]
+        },
+
+        // ── Entropy ──
+        ent: {
+            probs: [0.5, 0.5],
+            labels: ['Heads', 'Tails'],
+            sum: 1,
+            valid: true,
+            bits: 1,
+            nats: 0.6931,
+            bans: 0.3010,
+            maxBits: 1,
+            sliderP: 0.5,
+            showLearn: false
+        },
+
+        init() {
+            this.validateTable();
+            this.validateJoint();
+            this.$nextTick(() => this.initDistChart());
+            this.cltGeneratePopulation();
+            this.entCompute();
+        },
+
+        fmt(v) { return v == null ? '—' : +parseFloat(v).toFixed(6) + ''; },
+
+        // ── Distribution Table ──
+        distColors: [
+            'rgba(79,110,247,0.75)', 'rgba(231,76,60,0.75)', 'rgba(46,204,113,0.75)',
+            'rgba(241,196,15,0.75)', 'rgba(155,89,182,0.75)', 'rgba(230,126,34,0.75)',
+            'rgba(26,188,156,0.75)', 'rgba(52,73,94,0.75)', 'rgba(192,57,43,0.75)',
+            'rgba(22,160,133,0.75)', 'rgba(127,140,141,0.75)', 'rgba(44,62,80,0.75)'
+        ],
+
+        getDistColor(i) {
+            return this.distColors[i % this.distColors.length];
+        },
+
+        addTableRow() {
+            this.tbl.rows.push({ outcome: '', probability: null });
+            this.validateTable();
+        },
+
+        removeTableRow(i) {
+            if (this.tbl.rows.length <= 1) return;
+            this.tbl.rows.splice(i, 1);
+            this.validateTable();
+        },
+
+        loadPreset(preset) {
+            if (!preset) return;
+            const presets = {
+                coin: [
+                    { outcome: 'Heads', probability: 0.5 },
+                    { outcome: 'Tails', probability: 0.5 }
+                ],
+                die: [
+                    { outcome: '1', probability: 1/6 },
+                    { outcome: '2', probability: 1/6 },
+                    { outcome: '3', probability: 1/6 },
+                    { outcome: '4', probability: 1/6 },
+                    { outcome: '5', probability: 1/6 },
+                    { outcome: '6', probability: 1/6 }
+                ],
+                loaded: [
+                    { outcome: '1', probability: 0.1 },
+                    { outcome: '2', probability: 0.1 },
+                    { outcome: '3', probability: 0.1 },
+                    { outcome: '4', probability: 0.1 },
+                    { outcome: '5', probability: 0.1 },
+                    { outcome: '6', probability: 0.5 }
+                ],
+                weather: [
+                    { outcome: 'Sunny', probability: 0.45 },
+                    { outcome: 'Cloudy', probability: 0.25 },
+                    { outcome: 'Rainy', probability: 0.20 },
+                    { outcome: 'Snowy', probability: 0.10 }
+                ]
+            };
+            if (presets[preset]) {
+                this.tbl.rows = presets[preset].map(r => ({ ...r }));
+                this.validateTable();
+                this.$nextTick(() => this.updateDistChart());
+            }
+        },
+
+        validateTable() {
+            const errors = [];
+            let sum = 0;
+            let allFilled = true;
+            let hasAnyProb = false;
+
+            for (let i = 0; i < this.tbl.rows.length; i++) {
+                const row = this.tbl.rows[i];
+                const label = row.outcome ? `"${row.outcome}"` : `Row ${i + 1}`;
+
+                if (!row.outcome || row.outcome.trim() === '') {
+                    errors.push(`${label}: outcome name is required.`);
+                }
+
+                if (row.probability == null || row.probability === '') {
+                    allFilled = false;
+                } else {
+                    hasAnyProb = true;
+                    const p = Number(row.probability);
+                    if (isNaN(p)) {
+                        errors.push(`${label}: probability must be a number.`);
+                    } else if (p < 0) {
+                        errors.push(`${label}: probability cannot be negative (got ${p}).`);
+                    } else if (p > 1) {
+                        errors.push(`${label}: probability cannot exceed 1 (got ${p}).`);
+                    } else {
+                        sum += p;
+                    }
+                }
+            }
+
+            const names = this.tbl.rows.map(r => (r.outcome || '').trim().toLowerCase()).filter(n => n !== '');
+            const seen = new Set();
+            for (const n of names) {
+                if (seen.has(n)) {
+                    errors.push(`Duplicate outcome "${n}" — each outcome must be unique.`);
+                    break;
+                }
+                seen.add(n);
+            }
+
+            this.tbl.sum = hasAnyProb ? sum : null;
+            const tolerance = 0.0001;
+            if (allFilled && hasAnyProb) {
+                if (Math.abs(sum - 1) > tolerance) {
+                    errors.push(`Probabilities sum to ${this.fmt(sum)} — they must sum to exactly 1.`);
+                }
+            }
+
+            if (this.tbl.sum != null) {
+                this.tbl.sumClass = Math.abs(this.tbl.sum - 1) <= tolerance ? 'text-success' : 'text-danger';
+            } else {
+                this.tbl.sumClass = 'text-muted';
+            }
+
+            this.tbl.errors = errors;
+            this.tbl.valid = errors.length === 0 && allFilled && hasAnyProb && Math.abs(sum - 1) <= tolerance;
+
+            this.tbl.stats = null;
+            this.tbl.blocks = [];
+            if (this.tbl.valid) {
+                this.computeTableStats();
+                this.buildBlocks();
+            }
+
+            this.$nextTick(() => this.updateDistChart());
+        },
+
+        computeTableStats() {
+            const rows = this.tbl.rows;
+            const nums = rows.map(r => parseFloat(r.outcome));
+            const hasNumeric = nums.every(n => !isNaN(n));
+
+            let expectedValue = null;
+            let variance = null;
+            let stdDev = null;
+
+            if (hasNumeric) {
+                expectedValue = 0;
+                for (let i = 0; i < rows.length; i++) {
+                    expectedValue += nums[i] * rows[i].probability;
+                }
+                variance = 0;
+                for (let i = 0; i < rows.length; i++) {
+                    variance += rows[i].probability * Math.pow(nums[i] - expectedValue, 2);
+                }
+                stdDev = Math.sqrt(variance);
+            }
+
+            let maxP = -1, minP = 2, modeLabel = '', leastLabel = '';
+            for (const row of rows) {
+                if (row.probability > maxP) { maxP = row.probability; modeLabel = row.outcome; }
+                if (row.probability < minP) { minP = row.probability; leastLabel = row.outcome; }
+            }
+
+            this.tbl.stats = {
+                hasNumeric,
+                expectedValue,
+                variance,
+                stdDev,
+                mode: modeLabel + ' (P=' + this.fmt(maxP) + ')',
+                least: leastLabel + ' (P=' + this.fmt(minP) + ')'
+            };
+        },
+
+        buildBlocks() {
+            const blocks = [];
+            for (let i = 0; i < this.tbl.rows.length; i++) {
+                const row = this.tbl.rows[i];
+                const count = Math.round(row.probability * 100);
+                const color = this.getDistColor(i);
+                for (let j = 0; j < count; j++) {
+                    blocks.push({ outcome: row.outcome, probability: row.probability, color });
+                }
+            }
+            while (blocks.length < 100) {
+                blocks.push({ outcome: '', probability: 0, color: 'var(--tc-border)' });
+            }
+            this.tbl.blocks = blocks.slice(0, 100);
+        },
+
+        initDistChart() {
+            this.$nextTick(() => {
+                if (distChart) { this.updateDistChart(); return; }
+                const canvas = document.getElementById('distChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                const ctx = canvas.getContext('2d');
+                distChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'P(x)',
+                            data: [],
+                            backgroundColor: [],
+                            borderColor: [],
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 300 },
+                        plugins: { legend: { display: false }, annotation: {} },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Outcome', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { display: false }
+                            },
+                            y: {
+                                min: 0, max: 1,
+                                title: { display: true, text: 'P(x)', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { color: 'var(--tc-border)' }
+                            }
+                        }
+                    }
+                });
+                this.updateDistChart();
+            });
+        },
+
+        updateDistChart() {
+            if (!distChart) return;
+            const rows = this.tbl.rows;
+            const labels = rows.map((r, i) => r.outcome || ('Outcome ' + (i + 1)));
+            const data = rows.map(r => (r.probability != null && r.probability >= 0 && r.probability <= 1) ? r.probability : 0);
+            const bgColors = rows.map((_, i) => this.getDistColor(i));
+            const borderColors = bgColors.map(c => c.replace('0.75', '1'));
+
+            distChart.data.labels = labels;
+            distChart.data.datasets[0].data = data;
+            distChart.data.datasets[0].backgroundColor = bgColors;
+            distChart.data.datasets[0].borderColor = borderColors;
+
+            const maxVal = Math.max(...data, 0.1);
+            distChart.options.scales.y.max = Math.min(1, Math.ceil(maxVal * 10) / 10 + 0.1);
+            distChart.update();
+        },
+
+        // ── Joint Probability ──
+        addJointRow() {
+            this.jt.rowLabels.push('');
+            this.jt.cells.push(new Array(this.jt.colLabels.length).fill(0));
+            this.validateJoint();
+        },
+
+        removeJointRow() {
+            if (this.jt.rowLabels.length <= 1) return;
+            this.jt.rowLabels.pop();
+            this.jt.cells.pop();
+            if (this.jt.selRow >= this.jt.rowLabels.length) this.jt.selRow = this.jt.rowLabels.length - 1;
+            this.validateJoint();
+        },
+
+        addJointCol() {
+            this.jt.colLabels.push('');
+            for (let i = 0; i < this.jt.cells.length; i++) {
+                this.jt.cells[i].push(0);
+            }
+            this.validateJoint();
+        },
+
+        removeJointCol() {
+            if (this.jt.colLabels.length <= 1) return;
+            this.jt.colLabels.pop();
+            for (let i = 0; i < this.jt.cells.length; i++) {
+                this.jt.cells[i].pop();
+            }
+            if (this.jt.selCol >= this.jt.colLabels.length) this.jt.selCol = this.jt.colLabels.length - 1;
+            this.validateJoint();
+        },
+
+        loadJointPreset(preset) {
+            if (!preset) return;
+            const presets = {
+                gender_sport: {
+                    rowLabels: ['Male', 'Female'],
+                    colLabels: ['Football', 'Basketball', 'Tennis'],
+                    cells: [[0.20, 0.10, 0.15], [0.10, 0.20, 0.25]]
+                },
+                weather_commute: {
+                    rowLabels: ['Sunny', 'Rainy', 'Snowy'],
+                    colLabels: ['Drive', 'Bus', 'Walk'],
+                    cells: [[0.25, 0.10, 0.15], [0.05, 0.20, 0.02], [0.03, 0.15, 0.05]]
+                },
+                dice_independent: {
+                    rowLabels: ['Die A ≤ 3', 'Die A > 3'],
+                    colLabels: ['Die B ≤ 3', 'Die B > 3'],
+                    cells: [[0.25, 0.25], [0.25, 0.25]]
+                },
+                grade_study: {
+                    rowLabels: ['A', 'B', 'C'],
+                    colLabels: ['< 2 hrs', '2-5 hrs', '> 5 hrs'],
+                    cells: [[0.02, 0.08, 0.20], [0.05, 0.20, 0.10], [0.18, 0.12, 0.05]]
+                }
+            };
+            const p = presets[preset];
+            if (!p) return;
+            this.jt.rowLabels = [...p.rowLabels];
+            this.jt.colLabels = [...p.colLabels];
+            this.jt.cells = p.cells.map(r => [...r]);
+            this.jt.selRow = 0;
+            this.jt.selCol = 0;
+            this.validateJoint();
+            this.$nextTick(() => this.updateJointChart());
+        },
+
+        validateJoint() {
+            const errors = [];
+            const rows = this.jt.rowLabels.length;
+            const cols = this.jt.colLabels.length;
+
+            while (this.jt.cells.length < rows) this.jt.cells.push(new Array(cols).fill(0));
+            for (let i = 0; i < rows; i++) {
+                while (this.jt.cells[i].length < cols) this.jt.cells[i].push(0);
+            }
+
+            const rlNames = this.jt.rowLabels.map(l => (l || '').trim().toLowerCase()).filter(n => n !== '');
+            const clNames = this.jt.colLabels.map(l => (l || '').trim().toLowerCase()).filter(n => n !== '');
+            const rlSeen = new Set();
+            for (const n of rlNames) { if (rlSeen.has(n)) { errors.push(`Duplicate row label "${n}".`); break; } rlSeen.add(n); }
+            const clSeen = new Set();
+            for (const n of clNames) { if (clSeen.has(n)) { errors.push(`Duplicate column label "${n}".`); break; } clSeen.add(n); }
+
+            let grandTotal = 0;
+            let allFilled = true;
+            const rowMarginals = new Array(rows).fill(0);
+            const colMarginals = new Array(cols).fill(0);
+
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    const v = this.jt.cells[i][j];
+                    if (v == null || v === '') {
+                        allFilled = false;
+                        continue;
+                    }
+                    const p = Number(v);
+                    if (isNaN(p)) {
+                        errors.push(`Cell (${i + 1},${j + 1}): not a number.`);
+                    } else if (p < 0) {
+                        errors.push(`Cell (${i + 1},${j + 1}): probability cannot be negative.`);
+                    } else if (p > 1) {
+                        errors.push(`Cell (${i + 1},${j + 1}): probability cannot exceed 1.`);
+                    } else {
+                        rowMarginals[i] += p;
+                        colMarginals[j] += p;
+                        grandTotal += p;
+                    }
+                }
+            }
+
+            this.jt.rowMarginals = rowMarginals;
+            this.jt.colMarginals = colMarginals;
+            this.jt.grandTotal = grandTotal;
+
+            const tolerance = 0.0001;
+            if (allFilled && Math.abs(grandTotal - 1) > tolerance) {
+                errors.push(`Grand total is ${this.fmt(grandTotal)} — must equal 1.`);
+            }
+
+            this.jt.errors = errors;
+            this.jt.valid = errors.length === 0 && allFilled && Math.abs(grandTotal - 1) <= tolerance;
+
+            this.jt.independent = false;
+            this.jt.maxDeviation = 0;
+            this.jt.maxDeviationCell = '';
+            if (this.jt.valid) {
+                let maxDev = 0;
+                let maxCell = '';
+                let isIndep = true;
+                for (let i = 0; i < rows; i++) {
+                    for (let j = 0; j < cols; j++) {
+                        const expected = rowMarginals[i] * colMarginals[j];
+                        const actual = this.jt.cells[i][j];
+                        const dev = Math.abs(actual - expected);
+                        if (dev > tolerance) isIndep = false;
+                        if (dev > maxDev) {
+                            maxDev = dev;
+                            maxCell = (this.jt.rowLabels[i] || 'A'+(i+1)) + ' ∩ ' + (this.jt.colLabels[j] || 'B'+(j+1));
+                        }
+                    }
+                }
+                this.jt.independent = isIndep;
+                this.jt.maxDeviation = maxDev;
+                this.jt.maxDeviationCell = maxCell;
+            }
+
+            this.$nextTick(() => this.updateJointChart());
+        },
+
+        getHeatColor(p) {
+            if (p == null || isNaN(p) || p < 0) return 'var(--tc-bg)';
+            const intensity = Math.min(p / 0.35, 1);
+            const r = Math.round(79 + (255 - 79) * (1 - intensity));
+            const g = Math.round(110 + (255 - 110) * (1 - intensity));
+            const b = Math.round(247 + (255 - 247) * (1 - intensity));
+            return `rgba(${r},${g},${b},${0.15 + intensity * 0.6})`;
+        },
+
+        initJointChart() {
+            this.$nextTick(() => {
+                if (jointChart) { this.updateJointChart(); return; }
+                const canvas = document.getElementById('jointMarginalChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                const ctx = canvas.getContext('2d');
+                jointChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            { label: 'P(A) — Row marginals', data: [], backgroundColor: 'rgba(79,110,247,0.65)', borderRadius: 4 },
+                            { label: 'P(B) — Column marginals', data: [], backgroundColor: 'rgba(231,76,60,0.65)', borderRadius: 4 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 300 },
+                        plugins: { legend: { display: true, labels: { color: 'var(--tc-text-muted)', font: { size: 11 } } } },
+                        scales: {
+                            x: {
+                                ticks: { color: 'var(--tc-text-muted)', font: { size: 10 } },
+                                grid: { display: false }
+                            },
+                            y: {
+                                min: 0, max: 1,
+                                title: { display: true, text: 'P', color: 'var(--tc-text-muted)' },
+                                ticks: { color: 'var(--tc-text-muted)' },
+                                grid: { color: 'var(--tc-border)' }
+                            }
+                        }
+                    }
+                });
+                this.updateJointChart();
+            });
+        },
+
+        updateJointChart() {
+            if (!jointChart) return;
+            const rowLabels = this.jt.rowLabels.map((l, i) => l || ('A' + (i + 1)));
+            const colLabels = this.jt.colLabels.map((l, j) => l || ('B' + (j + 1)));
+            const maxLen = Math.max(rowLabels.length, colLabels.length);
+            const labels = [];
+            for (let k = 0; k < maxLen; k++) {
+                const parts = [];
+                if (k < rowLabels.length) parts.push(rowLabels[k]);
+                if (k < colLabels.length) parts.push(colLabels[k]);
+                labels.push(parts.join(' / '));
+            }
+
+            const rowData = [];
+            const colData = [];
+            for (let k = 0; k < maxLen; k++) {
+                rowData.push(k < this.jt.rowMarginals.length ? this.jt.rowMarginals[k] : null);
+                colData.push(k < this.jt.colMarginals.length ? this.jt.colMarginals[k] : null);
+            }
+
+            jointChart.data.labels = labels;
+            jointChart.data.datasets[0].data = rowData;
+            jointChart.data.datasets[1].data = colData;
+            const maxVal = Math.max(...rowData.filter(v => v != null), ...colData.filter(v => v != null), 0.1);
+            jointChart.options.scales.y.max = Math.min(1, Math.ceil(maxVal * 10) / 10 + 0.1);
+            jointChart.update();
+        },
+
+        // ═════════════════════════════════════════════════════════════
+        //  Named Distributions
+        // ═════════════════════════════════════════════════════════════
+
+        async computeNamedDist() {
+            this.nd.error = '';
+            this.nd.result = null;
+
+            const form = document.getElementById('dist-form-prob');
+            if (!form) return;
+            const fd = new FormData(form);
+            fd.set('distribution', this.nd.dist);
+
+            if (this.nd.dist === 'normal') {
+                fd.set('mean', this.nd.mean);
+                fd.set('stdDev', this.nd.stdDev);
+                if (this.nd.x !== null && this.nd.x !== '') fd.set('x', this.nd.x);
+            } else if (this.nd.dist === 'binomial') {
+                fd.set('n', this.nd.n);
+                fd.set('p', this.nd.p);
+                if (this.nd.k !== null && this.nd.k !== '') fd.set('k', this.nd.k);
+            } else if (this.nd.dist === 'poisson') {
+                fd.set('lambda', this.nd.lambda);
+                if (this.nd.k !== null && this.nd.k !== '') fd.set('k', this.nd.k);
+            }
+
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const json = await resp.json();
+                if (json.error) { this.nd.error = json.error; return; }
+                this.nd.result = json;
+                this.$nextTick(() => this.updateNamedChart());
+            } catch (e) {
+                this.nd.error = 'Computation failed: ' + e.message;
+            }
+        },
+
+        updateNamedChart() {
+            const json = this.nd.result;
+            if (!json) return;
+
+            this.$nextTick(() => {
+                const canvas = document.getElementById('namedDistChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+
+                if (namedDistChart) namedDistChart.destroy();
+                const ctx = canvas.getContext('2d');
+
+                if (json.type === 'normal') {
+                    const curveData = json.curve.map(pt => ({ x: pt.x, y: pt.y }));
+                    const datasets = [{
+                        label: `Normal(μ=${json.mean}, σ=${json.stdDev})`,
+                        data: curveData,
+                        showLine: true,
+                        borderColor: '#4f6ef7',
+                        backgroundColor: 'rgba(79, 110, 247, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.4
+                    }];
+
+                    // Shade region P(a ≤ X ≤ b)
+                    const a = this.nd.shadeA;
+                    const b = this.nd.shadeB;
+                    if (a != null && b != null && a < b) {
+                        const shaded = curveData.filter(pt => pt.x >= a && pt.x <= b);
+                        if (shaded.length > 0) {
+                            datasets.push({
+                                label: `P(${a} ≤ X ≤ ${b})`,
+                                data: shaded,
+                                showLine: true,
+                                borderColor: 'transparent',
+                                backgroundColor: 'rgba(46, 204, 113, 0.35)',
+                                borderWidth: 0,
+                                pointRadius: 0,
+                                fill: true,
+                                tension: 0.4
+                            });
+                        }
+                    }
+
+                    // Shade CDF region if x queried
+                    if (json.queriedX != null) {
+                        const cdfData = curveData.filter(pt => pt.x <= json.queriedX);
+                        datasets.push({
+                            label: `P(X ≤ ${json.queriedX}) = ${json.cdfAtX?.toFixed(4)}`,
+                            data: cdfData,
+                            showLine: true,
+                            borderColor: 'transparent',
+                            backgroundColor: 'rgba(79, 110, 247, 0.3)',
+                            borderWidth: 0,
+                            pointRadius: 0,
+                            fill: true,
+                            tension: 0.4
+                        });
+                    }
+
+                    namedDistChart = new Chart(ctx, {
+                        type: 'scatter',
+                        data: { datasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: { duration: 300 },
+                            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, color: 'var(--tc-text-muted)' } } },
+                            scales: {
+                                x: { title: { display: true, text: 'x', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } },
+                                y: { title: { display: true, text: 'f(x)', color: 'var(--tc-text-muted)' }, beginAtZero: true, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } }
+                            }
+                        }
+                    });
+                } else {
+                    // Discrete (Binomial / Poisson) — bar chart
+                    const labels = json.points.map(pt => pt.x.toString());
+                    const data = json.points.map(pt => pt.y);
+                    const qk = json.queriedK;
+                    const bgColors = data.map((_, i) => {
+                        if (qk != null && json.points[i].x === qk) return '#e74c3c';
+                        return 'rgba(79, 110, 247, 0.6)';
+                    });
+
+                    const datasets = [{
+                        label: json.type === 'binomial'
+                            ? `Binomial(n=${json.n}, p=${json.p})`
+                            : `Poisson(λ=${json.lambda})`,
+                        data: data,
+                        backgroundColor: bgColors,
+                        borderRadius: 3
+                    }];
+
+                    // Normal approximation overlay
+                    if (this.nd.compare && json.type !== 'normal') {
+                        const mu = json.expectedValue;
+                        const sigma = json.stdDev;
+                        if (sigma > 0) {
+                            const normalOverlay = json.points.map(pt => {
+                                const z = (pt.x - mu) / sigma;
+                                return (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * z * z);
+                            });
+                            datasets.push({
+                                label: `Normal(μ=${mu.toFixed(2)}, σ=${sigma.toFixed(2)})`,
+                                data: normalOverlay,
+                                type: 'line',
+                                borderColor: '#e74c3c',
+                                borderWidth: 2,
+                                borderDash: [6, 3],
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.4
+                            });
+                        }
+                    }
+
+                    namedDistChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: { labels, datasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: { duration: 300 },
+                            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, color: 'var(--tc-text-muted)' } } },
+                            scales: {
+                                x: { title: { display: true, text: json.type === 'binomial' ? 'k (successes)' : 'k (events)', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { display: false } },
+                                y: { title: { display: true, text: 'P(X = k)', color: 'var(--tc-text-muted)' }, beginAtZero: true, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } }
+                            }
+                        }
+                    });
+                }
+            });
+        },
+
+        // ═════════════════════════════════════════════════════════════
+        //  Central Limit Theorem
+        // ═════════════════════════════════════════════════════════════
+
+        cltGeneratePopulation() {
+            const N = 10000;
+            let data = [];
+            let mean = 0, std = 0;
+
+            switch (this.clt.popType) {
+                case 'uniform':
+                    for (let i = 0; i < N; i++) data.push(Math.random() * 10);
+                    mean = 5; std = 10 / Math.sqrt(12);
+                    break;
+                case 'exponential':
+                    for (let i = 0; i < N; i++) data.push(-Math.log(1 - Math.random()));
+                    mean = 1; std = 1;
+                    break;
+                case 'bimodal':
+                    for (let i = 0; i < N; i++) {
+                        data.push(Math.random() < 0.5
+                            ? 2 + this._randNormal() * 0.8
+                            : 8 + this._randNormal() * 0.8);
+                    }
+                    mean = 5; std = Math.sqrt(data.reduce((s, v) => s + (v - 5) ** 2, 0) / N);
+                    break;
+                case 'rightSkew':
+                    for (let i = 0; i < N; i++) {
+                        let v = Math.pow(Math.random(), 3) * 10;
+                        data.push(v);
+                    }
+                    mean = data.reduce((a, b) => a + b, 0) / N;
+                    std = Math.sqrt(data.reduce((s, v) => s + (v - mean) ** 2, 0) / N);
+                    break;
+                case 'leftSkew':
+                    for (let i = 0; i < N; i++) {
+                        let v = 10 - Math.pow(Math.random(), 3) * 10;
+                        data.push(v);
+                    }
+                    mean = data.reduce((a, b) => a + b, 0) / N;
+                    std = Math.sqrt(data.reduce((s, v) => s + (v - mean) ** 2, 0) / N);
+                    break;
+            }
+
+            this.clt.popData = data;
+            this.clt.popMean = mean;
+            this.clt.popStd = std;
+            this.$nextTick(() => this.initCltPopChart());
+        },
+
+        _randNormal() {
+            // Box-Muller transform
+            let u = 0, v = 0;
+            while (u === 0) u = Math.random();
+            while (v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        },
+
+        cltReset() {
+            this.clt.sampleMeans = [];
+            this.clt.runMean = 0;
+            this.clt.runStd = 0;
+            this.cltGeneratePopulation();
+            this.$nextTick(() => this.updateCltMeansChart());
+        },
+
+        cltDraw(count) {
+            const pop = this.clt.popData;
+            const n = this.clt.n;
+            for (let c = 0; c < count; c++) {
+                let sum = 0;
+                for (let i = 0; i < n; i++) {
+                    sum += pop[Math.floor(Math.random() * pop.length)];
+                }
+                this.clt.sampleMeans.push(sum / n);
+            }
+            // Update running stats
+            const means = this.clt.sampleMeans;
+            const total = means.reduce((a, b) => a + b, 0);
+            this.clt.runMean = total / means.length;
+            if (means.length > 1) {
+                const m = this.clt.runMean;
+                this.clt.runStd = Math.sqrt(means.reduce((s, v) => s + (v - m) ** 2, 0) / (means.length - 1));
+            }
+            this.$nextTick(() => this.updateCltMeansChart());
+        },
+
+        initCltPopChart() {
+            this.$nextTick(() => {
+                const canvas = document.getElementById('cltPopChart');
+                if (!canvas || typeof Chart === 'undefined') return;
+                if (cltPopChart) cltPopChart.destroy();
+
+                // Build histogram of population
+                const data = this.clt.popData;
+                const binCount = 30;
+                const min = Math.min(...data);
+                const max = Math.max(...data);
+                const binWidth = (max - min) / binCount || 1;
+                const bins = new Array(binCount).fill(0);
+                for (const v of data) {
+                    let idx = Math.floor((v - min) / binWidth);
+                    if (idx >= binCount) idx = binCount - 1;
+                    bins[idx]++;
+                }
+                const labels = bins.map((_, i) => (min + i * binWidth + binWidth / 2).toFixed(1));
+
+                cltPopChart = new Chart(canvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Population',
+                            data: bins,
+                            backgroundColor: 'rgba(155, 89, 182, 0.6)',
+                            borderRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 200 },
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { display: true, ticks: { maxTicksLimit: 8, font: { size: 10 }, color: 'var(--tc-text-muted)' }, grid: { display: false } },
+                            y: { display: true, ticks: { color: 'var(--tc-text-muted)', font: { size: 10 } }, grid: { color: 'var(--tc-border)' } }
+                        }
+                    }
+                });
+            });
+        },
+
+        updateCltMeansChart() {
+            const canvas = document.getElementById('cltMeansChart');
+            if (!canvas || typeof Chart === 'undefined') return;
+
+            const means = this.clt.sampleMeans;
+            if (means.length === 0) {
+                if (cltMeansChart) { cltMeansChart.destroy(); cltMeansChart = null; }
+                return;
+            }
+
+            const binCount = 30;
+            const min = Math.min(...means);
+            const max = Math.max(...means);
+            const range = max - min || 1;
+            const binWidth = range / binCount;
+            const bins = new Array(binCount).fill(0);
+            for (const v of means) {
+                let idx = Math.floor((v - min) / binWidth);
+                if (idx >= binCount) idx = binCount - 1;
+                bins[idx]++;
+            }
+            const labels = bins.map((_, i) => (min + i * binWidth + binWidth / 2).toFixed(2));
+
+            const datasets = [{
+                label: 'Sample means',
+                data: bins,
+                backgroundColor: 'rgba(79, 110, 247, 0.6)',
+                borderRadius: 2
+            }];
+
+            // Normal overlay when we have enough samples
+            if (means.length >= 10) {
+                const mu = this.clt.popMean;
+                const se = this.clt.popStd / Math.sqrt(this.clt.n);
+                if (se > 0) {
+                    const normalData = labels.map(l => {
+                        const x = parseFloat(l);
+                        const z = (x - mu) / se;
+                        const pdf = (1 / (se * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * z * z);
+                        return pdf * means.length * binWidth;
+                    });
+                    datasets.push({
+                        label: `N(${mu.toFixed(2)}, ${(se).toFixed(3)}²)`,
+                        data: normalData,
+                        type: 'line',
+                        borderColor: '#e74c3c',
+                        borderWidth: 2,
+                        borderDash: [6, 3],
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0.4
+                    });
+                }
+            }
+
+            if (cltMeansChart) cltMeansChart.destroy();
+            cltMeansChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 150 },
+                    plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, color: 'var(--tc-text-muted)' } } },
+                    scales: {
+                        x: { display: true, ticks: { maxTicksLimit: 8, font: { size: 10 }, color: 'var(--tc-text-muted)' }, grid: { display: false } },
+                        y: { display: true, ticks: { color: 'var(--tc-text-muted)', font: { size: 10 } }, grid: { color: 'var(--tc-border)' } }
+                    }
+                }
+            });
+        },
+
+        // ═════════════════════════════════════════════════════════════
+        //  Shape Metrics (Skewness & Kurtosis)
+        // ═════════════════════════════════════════════════════════════
+
+        shapeLoadPreset(preset) {
+            const presets = {
+                normal: '2.1, 3.0, 3.5, 4.0, 4.2, 4.5, 4.8, 5.0, 5.0, 5.2, 5.5, 5.8, 6.0, 6.5, 7.0, 7.9',
+                rightSkew: '1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, 8, 10, 15, 20, 30',
+                leftSkew: '1, 5, 10, 15, 20, 25, 25, 27, 28, 28, 29, 29, 29, 30, 30, 30, 30, 30',
+                uniform: '1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10',
+                leptokurtic: '5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 10, 0, 11',
+                platykurtic: '1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10'
+            };
+            if (presets[preset]) {
+                this.shape.rawData = presets[preset];
+                this.shapeCompute();
+            }
+        },
+
+        async shapeCompute() {
+            this.shape.error = '';
+            this.shape.result = null;
+            if (!this.shape.rawData.trim()) return;
+
+            const form = document.getElementById('dist-form-shape');
+            if (!form) return;
+            const fd = new FormData(form);
+            fd.set('data', this.shape.rawData);
+
+            try {
+                const resp = await fetch(form.action, { method: 'POST', body: fd });
+                const json = await resp.json();
+                if (json.error) { this.shape.error = json.error; return; }
+                this.shape.result = json;
+                this.$nextTick(() => this.updateShapeChart(json));
+            } catch (e) {
+                this.shape.error = 'Computation failed: ' + e.message;
+            }
+        },
+
+        updateShapeChart(json) {
+            const canvas = document.getElementById('shapeChart');
+            if (!canvas || typeof Chart === 'undefined') return;
+            if (shapeChart) shapeChart.destroy();
+
+            const labels = json.histogram.map(b => b.label);
+            const data = json.histogram.map(b => b.count);
+
+            // Normal overlay
+            const totalCount = data.reduce((a, b) => a + b, 0);
+            const midpoints = json.histogram.map(b => b.midpoint);
+            const binWidth = midpoints.length > 1 ? midpoints[1] - midpoints[0] : 1;
+            const normalOverlay = midpoints.map(x => {
+                const z = (x - json.mean) / json.stdDev;
+                const pdf = (1 / (json.stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * z * z);
+                return pdf * totalCount * binWidth;
+            });
+
+            const datasets = [
+                {
+                    label: 'Data',
+                    data: data,
+                    backgroundColor: 'rgba(79, 110, 247, 0.6)',
+                    borderRadius: 3
+                },
+                {
+                    label: 'Normal overlay',
+                    data: normalOverlay,
+                    type: 'line',
+                    borderColor: '#e74c3c',
+                    borderWidth: 2,
+                    borderDash: [6, 3],
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.4
+                }
+            ];
+
+            // Annotation lines for mean, median, mode
+            const annotations = {};
+            const addLine = (id, val, color, label) => {
+                // Convert value to bar index (fractional)
+                if (midpoints.length === 0) return;
+                let idx = 0;
+                for (let i = 0; i < midpoints.length; i++) {
+                    if (midpoints[i] >= val) { idx = i; break; }
+                    idx = i;
+                }
+                annotations[id] = {
+                    type: 'line',
+                    xMin: idx, xMax: idx,
+                    borderColor: color,
+                    borderWidth: 2,
+                    borderDash: id === 'mode' ? [4, 4] : [],
+                    label: { display: true, content: label, position: 'start', font: { size: 10 }, backgroundColor: color }
+                };
+            };
+            addLine('mean', json.mean, '#e74c3c', 'Mean');
+            addLine('median', json.median, '#2ecc71', 'Median');
+            addLine('mode', json.mode, '#f39c12', 'Mode');
+
+            shapeChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 }, color: 'var(--tc-text-muted)' } },
+                        annotation: { annotations }
+                    },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 10, font: { size: 9 }, color: 'var(--tc-text-muted)' }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } }
+                    }
+                }
+            });
+        },
+
+        // ═════════════════════════════════════════════════════════════
+        //  Chebyshev's Inequality
+        // ═════════════════════════════════════════════════════════════
+
+        chebCompute() {
+            this.$nextTick(() => this.updateChebyshevChart());
+        },
+
+        updateChebyshevChart() {
+            const canvas = document.getElementById('chebyshevChart');
+            if (!canvas || typeof Chart === 'undefined') return;
+            if (chebyshevChart) chebyshevChart.destroy();
+
+            const mu = this.cheb.mean;
+            const sigma = this.cheb.sigma;
+            const k = this.cheb.k;
+
+            // Generate a generic bell curve centered at mu
+            const pts = 100;
+            const lo = mu - 4 * sigma;
+            const hi = mu + 4 * sigma;
+            const step = (hi - lo) / pts;
+            const xVals = [];
+            const yVals = [];
+            for (let i = 0; i <= pts; i++) {
+                const x = lo + i * step;
+                const z = (x - mu) / sigma;
+                const y = (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * z * z);
+                xVals.push(x);
+                yVals.push(y);
+            }
+
+            // Full curve
+            const fullCurve = xVals.map((x, i) => ({ x, y: yVals[i] }));
+
+            // Shaded inner region (within ±kσ)
+            const innerLo = mu - k * sigma;
+            const innerHi = mu + k * sigma;
+            const shadedInner = fullCurve.filter(pt => pt.x >= innerLo && pt.x <= innerHi);
+
+            const chebPct = ((1 - 1 / (k * k)) * 100).toFixed(1);
+
+            const datasets = [
+                {
+                    label: 'Distribution',
+                    data: fullCurve,
+                    showLine: true,
+                    borderColor: '#4f6ef7',
+                    backgroundColor: 'rgba(79, 110, 247, 0.08)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: `Within ±${k}σ (≥${chebPct}%)`,
+                    data: shadedInner,
+                    showLine: true,
+                    borderColor: 'transparent',
+                    backgroundColor: 'rgba(46, 204, 113, 0.35)',
+                    borderWidth: 0,
+                    pointRadius: 0,
+                    fill: true,
+                    tension: 0.4
+                }
+            ];
+
+            chebyshevChart = new Chart(canvas.getContext('2d'), {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 }, color: 'var(--tc-text-muted)' } },
+                        annotation: {
+                            annotations: {
+                                loLine: {
+                                    type: 'line',
+                                    xMin: innerLo, xMax: innerLo,
+                                    borderColor: '#e74c3c',
+                                    borderWidth: 2,
+                                    borderDash: [5, 3],
+                                    label: { display: true, content: `μ−${k}σ`, position: 'start', font: { size: 10 } }
+                                },
+                                hiLine: {
+                                    type: 'line',
+                                    xMin: innerHi, xMax: innerHi,
+                                    borderColor: '#e74c3c',
+                                    borderWidth: 2,
+                                    borderDash: [5, 3],
+                                    label: { display: true, content: `μ+${k}σ`, position: 'start', font: { size: 10 } }
+                                },
+                                muLine: {
+                                    type: 'line',
+                                    xMin: mu, xMax: mu,
+                                    borderColor: '#f39c12',
+                                    borderWidth: 1,
+                                    borderDash: [3, 3],
+                                    label: { display: true, content: 'μ', position: 'end', font: { size: 10 } }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'x', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } },
+                        y: { title: { display: true, text: 'f(x)', color: 'var(--tc-text-muted)' }, beginAtZero: true, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } }
+                    }
+                }
+            });
+        },
+
+        // ═════════════════════════════════════════════════════════════
+        //  Shannon Entropy
+        // ═════════════════════════════════════════════════════════════
+
+        entCompute() {
+            const probs = this.ent.probs.map(p => Number(p) || 0);
+            this.ent.sum = probs.reduce((a, b) => a + b, 0);
+            this.ent.valid = Math.abs(this.ent.sum - 1) < 0.0001 && probs.every(p => p >= 0 && p <= 1);
+
+            if (!this.ent.valid) {
+                this.ent.bits = 0;
+                this.ent.nats = 0;
+                this.ent.bans = 0;
+                return;
+            }
+
+            // Shannon entropy
+            let hBits = 0, hNats = 0, hBans = 0;
+            for (const p of probs) {
+                if (p > 0) {
+                    hBits -= p * Math.log2(p);
+                    hNats -= p * Math.log(p);
+                    hBans -= p * Math.log10(p);
+                }
+            }
+            this.ent.bits = hBits;
+            this.ent.nats = hNats;
+            this.ent.bans = hBans;
+            this.ent.maxBits = Math.log2(probs.length);
+
+            this.$nextTick(() => this.updateEntropyBarChart());
+        },
+
+        entMakeUniform() {
+            const n = this.ent.probs.length;
+            const p = 1 / n;
+            this.ent.probs = new Array(n).fill(parseFloat(p.toFixed(6)));
+            this.entCompute();
+        },
+
+        entLoadPreset(preset) {
+            const presets = {
+                fair_coin: { probs: [0.5, 0.5], labels: ['Heads', 'Tails'] },
+                fair_die: { probs: [1/6, 1/6, 1/6, 1/6, 1/6, 1/6], labels: ['1','2','3','4','5','6'] },
+                biased_coin: { probs: [0.9, 0.1], labels: ['Heads', 'Tails'] },
+                certain: { probs: [1.0, 0.0], labels: ['A', 'B'] }
+            };
+            const p = presets[preset];
+            if (!p) return;
+            this.ent.probs = p.probs.map(v => parseFloat(v.toFixed(6)));
+            this.ent.labels = [...p.labels];
+            this.entCompute();
+        },
+
+        updateEntSliderChart() {
+            const canvas = document.getElementById('entropySliderChart');
+            if (!canvas || typeof Chart === 'undefined') return;
+
+            // Generate full H(p) curve for binary distribution
+            const curveX = [];
+            const curveY = [];
+            for (let p = 0.01; p <= 0.99; p += 0.01) {
+                curveX.push(p.toFixed(2));
+                const h = -(p * Math.log2(p) + (1 - p) * Math.log2(1 - p));
+                curveY.push(h);
+            }
+
+            // Current point
+            const pv = this.ent.sliderP;
+            const hv = -(pv * Math.log2(pv) + (1 - pv) * Math.log2(1 - pv));
+
+            if (entropySliderChart) entropySliderChart.destroy();
+            entropySliderChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: curveX,
+                    datasets: [
+                        {
+                            label: 'H(p)',
+                            data: curveY,
+                            borderColor: '#4f6ef7',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: `P(A)=${pv.toFixed(2)}, H=${hv.toFixed(3)} bits`,
+                            data: curveX.map((x, i) => Math.abs(parseFloat(x) - pv) < 0.015 ? curveY[i] : null),
+                            borderColor: '#e74c3c',
+                            backgroundColor: '#e74c3c',
+                            pointRadius: curveX.map((x) => Math.abs(parseFloat(x) - pv) < 0.015 ? 6 : 0),
+                            showLine: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 150 },
+                    plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, color: 'var(--tc-text-muted)' } } },
+                    scales: {
+                        x: { title: { display: true, text: 'P(A)', color: 'var(--tc-text-muted)' }, ticks: { maxTicksLimit: 10, color: 'var(--tc-text-muted)' }, grid: { display: false } },
+                        y: { title: { display: true, text: 'H (bits)', color: 'var(--tc-text-muted)' }, min: 0, max: 1.1, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } }
+                    }
+                }
+            });
+        },
+
+        updateEntropyBarChart() {
+            const canvas = document.getElementById('entropyBarChart');
+            if (!canvas || typeof Chart === 'undefined') return;
+            if (entropyBarChart) entropyBarChart.destroy();
+
+            entropyBarChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Your distribution', 'Uniform (max)'],
+                    datasets: [{
+                        label: 'Entropy (bits)',
+                        data: [this.ent.bits, this.ent.maxBits],
+                        backgroundColor: ['rgba(79, 110, 247, 0.6)', 'rgba(46, 204, 113, 0.6)'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 300 },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: 'var(--tc-text-muted)' }, grid: { display: false } },
+                        y: { beginAtZero: true, title: { display: true, text: 'H (bits)', color: 'var(--tc-text-muted)' }, ticks: { color: 'var(--tc-text-muted)' }, grid: { color: 'var(--tc-border)' } }
+                    }
+                }
+            });
+        }
+    };
+}
+</script>

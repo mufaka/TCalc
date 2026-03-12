@@ -1099,6 +1099,308 @@ a:hover {
   max-height: 320px;
 }
 
+/* ============================================================
+   Shared UI Components (§6 — Shared UI Patterns & Components)
+   ============================================================ */
+
+/* ---------- Teaching Callout (💡 Learn panels) ---------- */
+
+.prob-teach-card,
+.dist-teach-card,
+.sim-teach-card,
+.inf-teach-card {
+  background: var(--tc-bg);
+  border: 1px solid var(--tc-border);
+  border-left: 4px solid var(--tc-accent);
+  border-radius: var(--tc-radius);
+  padding: .85rem 1rem;
+  font-size: .85rem;
+  color: var(--tc-text);
+  transition: background .25s ease, border-color .25s ease;
+}
+
+.prob-teach-card p:last-child,
+.dist-teach-card p:last-child,
+.sim-teach-card p:last-child,
+.inf-teach-card p:last-child {
+  margin-bottom: 0;
+}
+
+.teach-toggle-btn {
+  font-size: .82rem;
+  font-weight: 600;
+  padding: .35rem .75rem;
+  border-radius: 999px;
+  border: 1px solid var(--tc-border);
+  background: var(--tc-bg);
+  color: var(--tc-text-muted);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.teach-toggle-btn:hover {
+  background: var(--tc-card-hover-bg);
+  color: var(--tc-primary);
+  border-color: var(--tc-primary);
+}
+
+/* ---------- Formula display (KaTeX) ---------- */
+
+.tc-formula {
+  font-size: 1.05em;
+  padding: .15rem .25rem;
+  overflow-x: auto;
+}
+
+.tc-formula-block {
+  display: block;
+  text-align: center;
+  margin: .75rem 0;
+  padding: .5rem;
+  background: var(--tc-bg);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  overflow-x: auto;
+  transition: background .25s ease, border-color .25s ease;
+}
+
+/* ---------- Result grid (used by Inference MLE, etc.) ---------- */
+
+.prob-result-grid,
+.dist-result-grid,
+.sim-result-grid,
+.inf-result-grid {
+  display: grid;
+  gap: .5rem;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.prob-result-item,
+.dist-result-item,
+.sim-result-item,
+.inf-result-item {
+  background: var(--tc-bg);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  padding: .5rem .65rem;
+  transition: background .25s ease, border-color .25s ease;
+}
+
+.prob-result-label,
+.dist-result-label,
+.sim-result-label,
+.inf-result-label {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--tc-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.prob-result-value,
+.dist-result-value,
+.sim-result-value,
+.inf-result-value {
+  font-size: .95rem;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace;
+  color: var(--tc-text);
+}
+
+/* ---------- Distributions page section classes ---------- */
+
+.dist-type-selector { /* alias of prob-type-selector for Distributions page */
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--tc-border);
+  border-radius: 999px;
+  overflow: hidden;
+  width: fit-content;
+}
+.dist-type-btn {
+  padding: .4rem 1rem;
+  font-size: .85rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--tc-text-muted);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.dist-type-btn.active {
+  background: linear-gradient(135deg, var(--tc-gradient-from), var(--tc-gradient-to));
+  color: var(--tc-primary-fg);
+}
+.dist-type-btn:hover:not(.active) {
+  background: var(--tc-card-hover-bg);
+}
+
+.dist-result-card {
+  background: var(--tc-bg-elevated);
+  border: 1px solid rgba(79, 110, 247, 0.3);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  transition: background .25s ease, border-color .25s ease;
+}
+
+.dist-chart-container {
+  background: var(--tc-bg-elevated);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  height: 16rem;
+  position: relative;
+  transition: background .25s ease, border-color .25s ease;
+}
+.dist-chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+.dist-chart-container-tall {
+  height: 22rem;
+}
+
+/* ---------- Simulation page section classes ---------- */
+
+.sim-type-selector {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--tc-border);
+  border-radius: 999px;
+  overflow: hidden;
+  width: fit-content;
+}
+.sim-type-btn {
+  padding: .4rem 1rem;
+  font-size: .85rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--tc-text-muted);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.sim-type-btn.active {
+  background: linear-gradient(135deg, var(--tc-gradient-from), var(--tc-gradient-to));
+  color: var(--tc-primary-fg);
+}
+.sim-type-btn:hover:not(.active) {
+  background: var(--tc-card-hover-bg);
+}
+
+.sim-result-card {
+  background: var(--tc-bg-elevated);
+  border: 1px solid rgba(79, 110, 247, 0.3);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  transition: background .25s ease, border-color .25s ease;
+}
+
+.sim-chart-container {
+  background: var(--tc-bg-elevated);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  height: 16rem;
+  position: relative;
+  transition: background .25s ease, border-color .25s ease;
+}
+.sim-chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+.sim-chart-container-tall {
+  height: 22rem;
+}
+
+/* ---------- Inference page section classes ---------- */
+
+.inf-type-selector {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--tc-border);
+  border-radius: 999px;
+  overflow: hidden;
+  width: fit-content;
+}
+.inf-type-btn {
+  padding: .4rem 1rem;
+  font-size: .85rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--tc-text-muted);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.inf-type-btn.active {
+  background: linear-gradient(135deg, var(--tc-gradient-from), var(--tc-gradient-to));
+  color: var(--tc-primary-fg);
+}
+.inf-type-btn:hover:not(.active) {
+  background: var(--tc-card-hover-bg);
+}
+
+.inf-result-card {
+  background: var(--tc-bg-elevated);
+  border: 1px solid rgba(79, 110, 247, 0.3);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  transition: background .25s ease, border-color .25s ease;
+}
+
+.inf-chart-container {
+  background: var(--tc-bg-elevated);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  height: 16rem;
+  position: relative;
+  transition: background .25s ease, border-color .25s ease;
+}
+.inf-chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+.inf-chart-container-tall {
+  height: 22rem;
+}
+
+/* ---------- Data entry grid component ---------- */
+
+.tc-data-grid {
+  background: var(--tc-bg-elevated);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  padding: .75rem;
+  transition: background .25s ease, border-color .25s ease;
+}
+
+.tc-data-grid textarea {
+  font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace;
+  font-size: .85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.tc-data-grid-actions {
+  display: flex;
+  gap: .5rem;
+  margin-top: .5rem;
+}
+
+.tc-data-grid-error {
+  color: #e74c3c;
+  font-size: .83rem;
+  font-weight: 500;
+  margin-top: .35rem;
+}
+
+.tc-data-grid-count {
+  font-size: .78rem;
+  color: var(--tc-text-muted);
+  margin-top: .25rem;
+}
+
 /* ---------- Geometry calculator ---------- */
 
 .geo-svg {

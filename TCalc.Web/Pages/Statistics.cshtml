@@ -540,6 +540,346 @@
             </div>
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 5 — Time Series Analysis                   -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="calc-container mb-4">
+        <div class="stat-section-header">
+            <span class="stat-section-icon">📉</span>
+            <div>
+                <h5 class="mb-0 fw-bold">Time Series Analysis</h5>
+                <small class="text-muted">Decompose trends, explore autocorrelation, and forecast future values</small>
+            </div>
+        </div>
+
+        <!-- Data Input -->
+        <div class="row g-4 mb-3">
+            <div class="col-lg-6">
+                <label class="form-label small fw-semibold">Time Series Data</label>
+                <textarea class="form-control font-monospace stat-data-input" rows="4"
+                          x-model="tsData"
+                          placeholder="Enter comma-separated values (time-ordered), e.g.: 112, 118, 132, 129, 121, 135, 148, 148, 136, 119, 104, 118"></textarea>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="tsLoadPreset('airline')">✈ Airline Passengers</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="tsLoadPreset('temps')">🌡️ Monthly Temps</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="tsLoadPreset('sales')">💰 Quarterly Sales</button>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Seasonal Period</label>
+                        <select class="form-select form-select-sm" x-model.number="tsPeriod">
+                            <option value="4">4 (Quarterly)</option>
+                            <option value="7">7 (Weekly)</option>
+                            <option value="12">12 (Monthly)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Forecast Horizon</label>
+                        <input type="range" class="form-range mt-2" x-model.number="tsHorizon" min="1" max="12" step="1">
+                        <span class="small text-muted" x-text="tsHorizon + ' periods'"></span>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-primary btn-sm" x-on:click="tsAnalyze()">
+                        📉 Analyze Series
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" x-on:click="tsReset()">
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div x-show="tsHasResult" x-transition>
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="stat-chart-container">
+                        <h6 class="small fw-bold mb-2">Original + Trend</h6>
+                        <canvas id="tsDecompChart" style="height:250px;"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="stat-chart-container">
+                        <h6 class="small fw-bold mb-2">Autocorrelation (ACF)</h6>
+                        <canvas id="tsAcfChart" style="height:250px;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-chart-container mb-3">
+                <h6 class="small fw-bold mb-2">Forecast</h6>
+                <canvas id="tsForecastChart" style="height:250px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 6 — PCA Visualizer                         -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="calc-container mb-4">
+        <div class="stat-section-header">
+            <span class="stat-section-icon">🔬</span>
+            <div>
+                <h5 class="mb-0 fw-bold">PCA Visualizer (2-D)</h5>
+                <small class="text-muted">See how principal components find directions of maximum spread in your data</small>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">X values</label>
+                        <textarea class="form-control font-monospace stat-data-input" rows="4"
+                                  x-model="pcaX" placeholder="1, 2, 3, 4, 5"></textarea>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Y values</label>
+                        <textarea class="form-control font-monospace stat-data-input" rows="4"
+                                  x-model="pcaY" placeholder="2.1, 4.0, 5.9, 8.1, 10.2"></textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="pcaLoadPreset('correlated')">📈 Correlated</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="pcaLoadPreset('uncorrelated')">🔀 Uncorrelated</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="pcaLoadPreset('elliptical')">🔵 Elliptical</button>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-primary btn-sm" x-on:click="pcaCompute()">
+                        🔬 Compute PCA
+                    </button>
+                    <button type="button" class="btn btn-sm"
+                            :class="pcaShowProjection ? 'btn-warning' : 'btn-outline-warning'"
+                            x-on:click="pcaToggleProjection()" x-show="pcaHasResult">
+                        <span x-text="pcaShowProjection ? '↩ Show Original' : '➡ Project onto PC1'"></span>
+                    </button>
+                </div>
+
+                <!-- PCA Results -->
+                <div x-show="pcaHasResult" x-transition>
+                    <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">PC1 Explained</div>
+                            <div class="prob-result-value" x-text="pcaResult ? (pcaResult.explainedVariance1 * 100).toFixed(1) + '%' : ''"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">PC2 Explained</div>
+                            <div class="prob-result-value" x-text="pcaResult ? (pcaResult.explainedVariance2 * 100).toFixed(1) + '%' : ''"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">Eigenvalue 1</div>
+                            <div class="prob-result-value" x-text="pcaResult ? pcaResult.eigenvalue1.toFixed(4) : ''"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">Eigenvalue 2</div>
+                            <div class="prob-result-value" x-text="pcaResult ? pcaResult.eigenvalue2.toFixed(4) : ''"></div>
+                        </div>
+                    </div>
+                    <div class="prob-teach-card mt-2" style="font-size:.85rem;">
+                        💡 <strong>PCA finds the directions of maximum spread (variance) — PC1 captures the most information.</strong>
+                        Click "Project onto PC1" to see dimensionality reduction in action.
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="stat-chart-container stat-chart-container-tall" x-show="pcaHasResult" x-cloak>
+                    <h6 class="small fw-bold mb-2">Scatter Plot &amp; Principal Components</h6>
+                    <canvas id="pcaChart"></canvas>
+                </div>
+                <div x-show="!pcaHasResult" class="text-center text-muted py-5">
+                    <div style="font-size: 3rem; opacity: 0.2;">🔬</div>
+                    <p class="small mb-0 mt-2">Enter X and Y data, then click <strong>Compute PCA</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 7 — Multiple Regression                    -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="calc-container mb-4">
+        <div class="stat-section-header">
+            <span class="stat-section-icon">📊</span>
+            <div>
+                <h5 class="mb-0 fw-bold">Multiple Regression</h5>
+                <small class="text-muted">Fit a model with multiple predictor variables: ŷ = β₀ + β₁x₁ + β₂x₂ + …</small>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <!-- Predictor inputs -->
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Predictors (one column per line, comma-separated values)</label>
+                    <template x-for="(col, i) in mrPredictors" :key="i">
+                        <div class="input-group input-group-sm mb-1">
+                            <span class="input-group-text" style="min-width:40px;" x-text="'x' + (i+1)"></span>
+                            <input type="text" class="form-control font-monospace"
+                                   x-model="mrPredictors[i]" placeholder="1, 2, 3, 4, 5">
+                            <button class="btn btn-outline-danger" type="button"
+                                    x-on:click="mrPredictors.splice(i, 1)" x-show="mrPredictors.length > 1">✕</button>
+                        </div>
+                    </template>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                            x-on:click="mrPredictors.push('')" :disabled="mrPredictors.length >= 5">
+                        + Add Predictor
+                    </button>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Response (Y)</label>
+                    <input type="text" class="form-control form-control-sm font-monospace"
+                           x-model="mrY" placeholder="2.1, 4.0, 5.9, 8.1, 10.2">
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-primary btn-sm" x-on:click="mrCompute()">
+                        📊 Fit Multiple Regression
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="mrLoadExample()">Load Example</button>
+                </div>
+
+                <!-- Results -->
+                <div x-show="mrHasResult" x-transition>
+                    <div class="font-monospace fw-bold mb-2" style="font-size:.9rem;" x-text="mrEquation"></div>
+                    <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">R²</div>
+                            <div class="prob-result-value" x-text="mrR2"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">Adjusted R²</div>
+                            <div class="prob-result-value" x-text="mrAdjR2"></div>
+                        </div>
+                    </div>
+                    <!-- Coefficients table -->
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm table-bordered" style="font-size:.8rem;">
+                            <thead><tr><th>Coeff</th><th>Value</th><th>Std Error</th><th>t-stat</th></tr></thead>
+                            <tbody>
+                                <template x-for="(c, i) in mrCoeffs" :key="i">
+                                    <tr>
+                                        <td x-text="i === 0 ? 'β₀ (intercept)' : 'β' + i"></td>
+                                        <td x-text="c.toFixed(4)"></td>
+                                        <td x-text="mrSE[i] ? mrSE[i].toFixed(4) : '—'"></td>
+                                        <td x-text="mrTStats[i] ? mrTStats[i].toFixed(4) : '—'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="stat-chart-container stat-chart-container-tall" x-show="mrHasResult" x-cloak>
+                    <h6 class="small fw-bold mb-2">Actual vs Fitted</h6>
+                    <canvas id="mrChart"></canvas>
+                </div>
+                <div x-show="!mrHasResult" class="text-center text-muted py-5">
+                    <div style="font-size: 3rem; opacity: 0.2;">📊</div>
+                    <p class="small mb-0 mt-2">Enter predictor and response data, then click <strong>Fit Multiple Regression</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 8 — Logistic Regression                    -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="calc-container mb-4">
+        <div class="stat-section-header">
+            <span class="stat-section-icon">🎯</span>
+            <div>
+                <h5 class="mb-0 fw-bold">Logistic Regression</h5>
+                <small class="text-muted">Model binary outcomes: P(y=1|x) = 1/(1 + e^(−(β₀ + β₁x)))</small>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">X (predictor)</label>
+                        <textarea class="form-control font-monospace stat-data-input" rows="4"
+                                  x-model="logX" placeholder="1, 2, 3, 4, 5, 6, 7, 8"></textarea>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Y (0 or 1)</label>
+                        <textarea class="form-control font-monospace stat-data-input" rows="4"
+                                  x-model="logY" placeholder="0, 0, 0, 1, 0, 1, 1, 1"></textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="logLoadPreset('exam')">📝 Exam Pass</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            x-on:click="logLoadPreset('medical')">🏥 Treatment</button>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-primary btn-sm" x-on:click="logCompute()">
+                        🎯 Fit Logistic Model
+                    </button>
+                </div>
+
+                <!-- Threshold slider -->
+                <div x-show="logHasResult" x-transition class="mb-3">
+                    <label class="form-label small fw-semibold">Classification Threshold</label>
+                    <input type="range" class="form-range" x-model.number="logThreshold" min="0" max="1" step="0.05">
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>0</span>
+                        <span x-text="'Threshold = ' + logThreshold.toFixed(2)"></span>
+                        <span>1</span>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div x-show="logHasResult" x-transition>
+                    <div class="prob-result-grid" style="grid-template-columns:1fr 1fr;">
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">β₀ (intercept)</div>
+                            <div class="prob-result-value" x-text="logBeta0"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">β₁ (slope)</div>
+                            <div class="prob-result-value" x-text="logBeta1"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">Accuracy (t=<span x-text="logThreshold.toFixed(2)"></span>)</div>
+                            <div class="prob-result-value" x-text="logAccuracyAtThreshold"></div>
+                        </div>
+                        <div class="prob-result-item">
+                            <div class="prob-result-label">Equation</div>
+                            <div class="prob-result-value" style="font-size:.75rem;" x-text="'P = 1/(1+e^(-(' + logBeta0 + '+' + logBeta1 + 'x)))'"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="stat-chart-container stat-chart-container-tall" x-show="logHasResult" x-cloak>
+                    <h6 class="small fw-bold mb-2">Scatter &amp; Sigmoid Curve</h6>
+                    <canvas id="logChart"></canvas>
+                </div>
+                <div x-show="!logHasResult" class="text-center text-muted py-5">
+                    <div style="font-size: 3rem; opacity: 0.2;">🎯</div>
+                    <p class="small mb-0 mt-2">Enter X (predictor) and Y (0/1 outcome), then click <strong>Fit Logistic Model</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Hidden forms for anti-forgery tokens -->
@@ -571,6 +911,31 @@
     <input type="hidden" name="x" />
     <input type="hidden" name="k" />
 </form>
+<form id="stats-form-decompose" method="post" asp-page-handler="Decompose" style="display:none">
+    <input type="hidden" name="data" />
+    <input type="hidden" name="seasonalPeriod" />
+</form>
+<form id="stats-form-acf" method="post" asp-page-handler="Autocorrelation" style="display:none">
+    <input type="hidden" name="data" />
+    <input type="hidden" name="maxLag" />
+</form>
+<form id="stats-form-forecast" method="post" asp-page-handler="Forecast" style="display:none">
+    <input type="hidden" name="data" />
+    <input type="hidden" name="horizon" />
+    <input type="hidden" name="alpha" />
+</form>
+<form id="stats-form-pca" method="post" asp-page-handler="Pca" style="display:none">
+    <input type="hidden" name="dataX" />
+    <input type="hidden" name="dataY" />
+</form>
+<form id="stats-form-multireg" method="post" asp-page-handler="MultipleRegression" style="display:none">
+    <input type="hidden" name="columnsJson" />
+    <input type="hidden" name="dataY" />
+</form>
+<form id="stats-form-logreg" method="post" asp-page-handler="LogisticRegression" style="display:none">
+    <input type="hidden" name="dataX" />
+    <input type="hidden" name="dataY" />
+</form>
 
 @if (Model.PreloadJson is not null)
 {
@@ -581,6 +946,8 @@
 <script>
     function statsCalc() {
         let histChart = null, boxChart = null, scatterChart = null, probChart = null;
+        let tsDecompChart = null, tsAcfChart = null, tsForecastChart = null;
+        let pcaChart = null, mrChart = null, logChart = null;
 
         return {
             // Data
@@ -626,6 +993,45 @@
             probResult: null,
             showProbChart: false,
             probDefaultsApplied: false,
+
+            // Time Series
+            tsData: '',
+            tsPeriod: 12,
+            tsHorizon: 6,
+            tsHasResult: false,
+
+            // PCA
+            pcaX: '',
+            pcaY: '',
+            pcaResult: null,
+            pcaHasResult: false,
+            pcaShowProjection: false,
+
+            // Multiple Regression
+            mrPredictors: ['', ''],
+            mrY: '',
+            mrHasResult: false,
+            mrEquation: '',
+            mrR2: '',
+            mrAdjR2: '',
+            mrCoeffs: [],
+            mrSE: [],
+            mrTStats: [],
+            mrFitted: [],
+            mrActual: [],
+
+            // Logistic Regression
+            logX: '',
+            logY: '',
+            logHasResult: false,
+            logBeta0: '',
+            logBeta1: '',
+            logThreshold: 0.5,
+            logAccuracyAtThreshold: '',
+            _logPredProbs: [],
+            _logActualY: [],
+            _logSigmoid: null,
+            _logScatterX: [],
 
             // ─── Preload from server (when loading a saved data set) ───
             initPreload() {
@@ -1108,7 +1514,448 @@
                         }
                     });
                 });
-            }
+            },
+
+            // ═══════════════════════════════════════════════
+            // Time Series
+            // ═══════════════════════════════════════════════
+            tsLoadPreset(name) {
+                if (name === 'airline') {
+                    this.tsData = '112,118,132,129,121,135,148,148,136,119,104,118,115,126,141,135,125,149,170,170,158,133,114,140,145,150,178,163,172,178,199,199,184,162,146,166';
+                    this.tsPeriod = 12;
+                } else if (name === 'temps') {
+                    this.tsData = '30,32,45,60,72,80,85,82,70,55,40,33,31,34,48,62,75,83,87,84,72,58,42,35';
+                    this.tsPeriod = 12;
+                } else if (name === 'sales') {
+                    this.tsData = '200,220,310,280,210,235,325,295,225,250,340,310,240,265,360,330';
+                    this.tsPeriod = 4;
+                }
+            },
+
+            tsReset() {
+                this.tsHasResult = false;
+                if (tsDecompChart) { tsDecompChart.destroy(); tsDecompChart = null; }
+                if (tsAcfChart) { tsAcfChart.destroy(); tsAcfChart = null; }
+                if (tsForecastChart) { tsForecastChart.destroy(); tsForecastChart = null; }
+            },
+
+            async tsAnalyze() {
+                if (!this.tsData.trim()) { this.chartError = 'Enter time series data.'; return; }
+                this.chartError = '';
+
+                try {
+                    // Decomposition
+                    const decompForm = document.getElementById('stats-form-decompose');
+                    const decompFd = new FormData(decompForm);
+                    decompFd.set('data', this.tsData);
+                    decompFd.set('seasonalPeriod', this.tsPeriod);
+                    const decompResp = await fetch(decompForm.action, { method: 'POST', body: decompFd });
+                    const decompJson = await decompResp.json();
+
+                    // ACF
+                    const acfForm = document.getElementById('stats-form-acf');
+                    const acfFd = new FormData(acfForm);
+                    acfFd.set('data', this.tsData);
+                    acfFd.set('maxLag', Math.min(20, Math.floor(this.tsData.split(',').length / 2)));
+                    const acfResp = await fetch(acfForm.action, { method: 'POST', body: acfFd });
+                    const acfJson = await acfResp.json();
+
+                    // Forecast
+                    const fcForm = document.getElementById('stats-form-forecast');
+                    const fcFd = new FormData(fcForm);
+                    fcFd.set('data', this.tsData);
+                    fcFd.set('horizon', this.tsHorizon);
+                    fcFd.set('alpha', '0.3');
+                    const fcResp = await fetch(fcForm.action, { method: 'POST', body: fcFd });
+                    const fcJson = await fcResp.json();
+
+                    if (decompJson.error) { this.chartError = decompJson.error; return; }
+                    if (acfJson.error) { this.chartError = acfJson.error; return; }
+                    if (fcJson.error) { this.chartError = fcJson.error; return; }
+
+                    this.tsHasResult = true;
+                    this.$nextTick(() => {
+                        this.tsRenderDecomp(decompJson);
+                        this.tsRenderAcf(acfJson);
+                        this.tsRenderForecast(fcJson);
+                    });
+                } catch (e) {
+                    this.chartError = 'Time series analysis failed: ' + e.message;
+                }
+            },
+
+            tsRenderDecomp(json) {
+                const ctx = document.getElementById('tsDecompChart');
+                if (!ctx) return;
+                if (tsDecompChart) tsDecompChart.destroy();
+                const labels = json.original.map((_, i) => '' + (i + 1));
+                const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+                tsDecompChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Original', data: json.original, borderColor: primary, borderWidth: 1.5, pointRadius: 2, tension: 0.2 },
+                            { label: 'Trend', data: json.trend, borderColor: '#dc3545', borderWidth: 2.5, pointRadius: 0, tension: 0.3, borderDash: [5, 3] },
+                        ],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+                        scales: { x: { title: { display: true, text: 'Period' } }, y: { title: { display: true, text: 'Value' } } },
+                    },
+                });
+            },
+
+            tsRenderAcf(json) {
+                const ctx = document.getElementById('tsAcfChart');
+                if (!ctx) return;
+                if (tsAcfChart) tsAcfChart.destroy();
+                const labels = json.lags.map(l => '' + l);
+                const band = json.significanceBand;
+                tsAcfChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'ACF', data: json.values,
+                            backgroundColor: json.values.map(v => Math.abs(v) > band ? 'rgba(220,53,69,0.5)' : 'rgba(79,110,247,0.5)'),
+                            borderColor: json.values.map(v => Math.abs(v) > band ? '#dc3545' : '#4f6ef7'),
+                            borderWidth: 1,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            annotation: {},
+                        },
+                        scales: {
+                            x: { title: { display: true, text: 'Lag' } },
+                            y: { title: { display: true, text: 'Autocorrelation' }, min: -1, max: 1 },
+                        },
+                    },
+                    plugins: [{
+                        id: 'acfBands',
+                        afterDraw: (chart) => {
+                            const { ctx: c, chartArea: { left, right }, scales: { y } } = chart;
+                            c.save();
+                            c.strokeStyle = '#6c757d';
+                            c.lineWidth = 1;
+                            c.setLineDash([4, 4]);
+                            [band, -band].forEach(v => {
+                                const py = y.getPixelForValue(v);
+                                c.beginPath(); c.moveTo(left, py); c.lineTo(right, py); c.stroke();
+                            });
+                            c.restore();
+                        }
+                    }],
+                });
+            },
+
+            tsRenderForecast(json) {
+                const ctx = document.getElementById('tsForecastChart');
+                if (!ctx) return;
+                if (tsForecastChart) tsForecastChart.destroy();
+                const n = json.historical.length;
+                const labels = [];
+                const histData = [];
+                const fcData = [];
+                const upperData = [];
+                const lowerData = [];
+                for (let i = 0; i < n; i++) {
+                    labels.push('' + (i + 1));
+                    histData.push(json.historical[i]);
+                    fcData.push(null);
+                    upperData.push(null);
+                    lowerData.push(null);
+                }
+                // bridge last historical to first forecast
+                fcData[n - 1] = json.historical[n - 1];
+                for (let i = 0; i < json.forecast.length; i++) {
+                    labels.push('' + (n + i + 1));
+                    histData.push(null);
+                    fcData.push(json.forecast[i]);
+                    upperData.push(json.upperBound[i]);
+                    lowerData.push(json.lowerBound[i]);
+                }
+                const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+                tsForecastChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Historical', data: histData, borderColor: primary, borderWidth: 1.5, pointRadius: 2, tension: 0.2 },
+                            { label: 'Forecast', data: fcData, borderColor: '#dc3545', borderWidth: 2, borderDash: [5, 3], pointRadius: 2, tension: 0.1 },
+                            { label: 'Upper 95%', data: upperData, borderColor: 'rgba(220,53,69,0.2)', borderWidth: 1, borderDash: [2, 2], pointRadius: 0, fill: false },
+                            { label: 'Lower 95%', data: lowerData, borderColor: 'rgba(220,53,69,0.2)', borderWidth: 1, borderDash: [2, 2], pointRadius: 0, fill: '-1', backgroundColor: 'rgba(220,53,69,0.08)' },
+                        ],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+                        scales: { x: { title: { display: true, text: 'Period' } }, y: { title: { display: true, text: 'Value' } } },
+                    },
+                });
+            },
+
+            // ═══════════════════════════════════════════════
+            // PCA
+            // ═══════════════════════════════════════════════
+            pcaLoadPreset(name) {
+                if (name === 'correlated') {
+                    this.pcaX = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15';
+                    this.pcaY = '2.1,4.3,5.8,8.2,10.1,12.5,13.8,16.0,18.3,20.1,22.4,24.0,26.3,28.1,30.2';
+                } else if (name === 'uncorrelated') {
+                    this.pcaX = '5,2,8,1,9,3,7,4,6,10,2,8,3,7,5';
+                    this.pcaY = '3,9,1,7,4,8,2,6,5,3,7,4,9,1,6';
+                } else if (name === 'elliptical') {
+                    this.pcaX = '2,3,4,5,6,3,4,5,6,7,4,5,6,7,8';
+                    this.pcaY = '5,6,7,8,9,4,5,6,7,8,3,4,5,6,7';
+                }
+                this.$nextTick(() => this.pcaCompute());
+            },
+
+            async pcaCompute() {
+                if (!this.pcaX.trim() || !this.pcaY.trim()) { this.chartError = 'Enter X and Y data for PCA.'; return; }
+                this.chartError = '';
+                const form = document.getElementById('stats-form-pca');
+                const fd = new FormData(form);
+                fd.set('dataX', this.pcaX);
+                fd.set('dataY', this.pcaY);
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; return; }
+                    this.pcaResult = json;
+                    this.pcaHasResult = true;
+                    this.pcaShowProjection = false;
+                    this.$nextTick(() => this.pcaRenderChart());
+                } catch (e) { this.chartError = 'PCA failed: ' + e.message; }
+            },
+
+            pcaToggleProjection() {
+                this.pcaShowProjection = !this.pcaShowProjection;
+                this.pcaRenderChart();
+            },
+
+            pcaRenderChart() {
+                const ctx = document.getElementById('pcaChart');
+                if (!ctx || !this.pcaResult) return;
+                if (pcaChart) pcaChart.destroy();
+
+                const r = this.pcaResult;
+                const showProj = this.pcaShowProjection;
+                const pointsX = showProj ? r.projectedX : r.originalX;
+                const pointsY = showProj ? r.projectedY : r.originalY;
+                const data = pointsX.map((x, i) => ({ x, y: pointsY[i] }));
+                const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+
+                const datasets = [
+                    { label: showProj ? 'Projected onto PC1' : 'Data Points', data, backgroundColor: primary, pointRadius: 5 },
+                ];
+
+                if (!showProj) {
+                    // PC axes as arrows from centroid
+                    const scale1 = Math.sqrt(r.eigenvalue1) * 2;
+                    const scale2 = Math.sqrt(r.eigenvalue2) * 2;
+                    datasets.push({
+                        label: 'PC1 (' + (r.explainedVariance1 * 100).toFixed(1) + '%)',
+                        data: [
+                            { x: r.meanX - r.pc1X * scale1, y: r.meanY - r.pc1Y * scale1 },
+                            { x: r.meanX + r.pc1X * scale1, y: r.meanY + r.pc1Y * scale1 },
+                        ],
+                        showLine: true, borderColor: '#dc3545', borderWidth: 3, pointRadius: 0, tension: 0,
+                    });
+                    datasets.push({
+                        label: 'PC2 (' + (r.explainedVariance2 * 100).toFixed(1) + '%)',
+                        data: [
+                            { x: r.meanX - r.pc2X * scale2, y: r.meanY - r.pc2Y * scale2 },
+                            { x: r.meanX + r.pc2X * scale2, y: r.meanY + r.pc2Y * scale2 },
+                        ],
+                        showLine: true, borderColor: '#198754', borderWidth: 2, borderDash: [5, 3], pointRadius: 0, tension: 0,
+                    });
+                    // centroid marker
+                    datasets.push({
+                        label: 'Centroid',
+                        data: [{ x: r.meanX, y: r.meanY }],
+                        pointRadius: 8, pointBackgroundColor: '#ffc107', pointBorderColor: '#333', pointBorderWidth: 2,
+                    });
+                }
+
+                pcaChart = new Chart(ctx, {
+                    type: 'scatter',
+                    data: { datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        aspectRatio: 1,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+                        scales: {
+                            x: { title: { display: true, text: 'X' } },
+                            y: { title: { display: true, text: 'Y' } },
+                        },
+                    },
+                });
+            },
+
+            // ═══════════════════════════════════════════════
+            // Multiple Regression
+            // ═══════════════════════════════════════════════
+            mrLoadExample() {
+                this.mrPredictors = [
+                    '1500,1600,1700,1800,1900,2000,2100,2200,2300,2400',
+                    '3,3,3,4,4,4,5,5,5,6',
+                ];
+                this.mrY = '245,312,279,308,350,375,391,480,425,510';
+            },
+
+            async mrCompute() {
+                this.chartError = '';
+                this.mrHasResult = false;
+                const colArrays = this.mrPredictors.map(s =>
+                    s.split(/[,\s]+/).map(v => parseFloat(v.trim())).filter(v => !isNaN(v))
+                ).filter(a => a.length > 0);
+                if (colArrays.length === 0) { this.chartError = 'Enter at least one predictor column.'; return; }
+                if (!this.mrY.trim()) { this.chartError = 'Enter response (Y) data.'; return; }
+
+                const form = document.getElementById('stats-form-multireg');
+                const fd = new FormData(form);
+                fd.set('columnsJson', JSON.stringify(colArrays));
+                fd.set('dataY', this.mrY);
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; return; }
+
+                    this.mrEquation = json.equation;
+                    this.mrR2 = json.rSquared.toFixed(6);
+                    this.mrAdjR2 = json.adjustedRSquared.toFixed(6);
+                    this.mrCoeffs = json.coefficients;
+                    this.mrSE = json.standardErrors;
+                    this.mrTStats = json.tStatistics;
+                    this.mrFitted = json.fittedValues;
+                    this.mrActual = this.mrY.split(/[,\s]+/).map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+                    this.mrHasResult = true;
+                    this.$nextTick(() => this.mrRenderChart());
+                } catch (e) { this.chartError = 'Multiple regression failed: ' + e.message; }
+            },
+
+            mrRenderChart() {
+                const ctx = document.getElementById('mrChart');
+                if (!ctx) return;
+                if (mrChart) mrChart.destroy();
+                const labels = this.mrActual.map((_, i) => '' + (i + 1));
+                const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+                mrChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Actual', data: this.mrActual, borderColor: primary, borderWidth: 2, pointRadius: 4 },
+                            { label: 'Fitted', data: this.mrFitted, borderColor: '#dc3545', borderWidth: 2, borderDash: [5, 3], pointRadius: 3 },
+                        ],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+                        scales: { x: { title: { display: true, text: 'Observation' } }, y: { title: { display: true, text: 'Value' } } },
+                    },
+                });
+            },
+
+            // ═══════════════════════════════════════════════
+            // Logistic Regression
+            // ═══════════════════════════════════════════════
+            logLoadPreset(name) {
+                if (name === 'exam') {
+                    this.logX = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20';
+                    this.logY = '0,0,0,0,0,0,1,0,0,1,0,1,0,1,1,1,1,1,1,1';
+                } else if (name === 'medical') {
+                    this.logX = '10,20,30,40,50,60,70,80,90,100,15,25,35,45,55,65,75,85,95,5';
+                    this.logY = '0,0,0,0,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,0';
+                }
+                this.$nextTick(() => this.logCompute());
+            },
+
+            async logCompute() {
+                if (!this.logX.trim() || !this.logY.trim()) { this.chartError = 'Enter X and Y data.'; return; }
+                this.chartError = '';
+                this.logHasResult = false;
+                const form = document.getElementById('stats-form-logreg');
+                const fd = new FormData(form);
+                fd.set('dataX', this.logX);
+                fd.set('dataY', this.logY);
+                try {
+                    const resp = await fetch(form.action, { method: 'POST', body: fd });
+                    const json = await resp.json();
+                    if (json.error) { this.chartError = json.error; return; }
+
+                    this.logBeta0 = json.beta0.toFixed(4);
+                    this.logBeta1 = json.beta1.toFixed(4);
+                    this._logPredProbs = json.predictedProbabilities;
+                    this._logActualY = Array.from(json.scatterY);
+                    this._logSigmoid = json.sigmoidCurve;
+                    this._logScatterX = Array.from(json.scatterX);
+                    this.logHasResult = true;
+                    this.logUpdateAccuracy();
+                    this.$nextTick(() => this.logRenderChart());
+                } catch (e) { this.chartError = 'Logistic regression failed: ' + e.message; }
+            },
+
+            logUpdateAccuracy() {
+                if (!this._logPredProbs || this._logPredProbs.length === 0) return;
+                const t = this.logThreshold;
+                let correct = 0;
+                for (let i = 0; i < this._logPredProbs.length; i++) {
+                    const predicted = this._logPredProbs[i] >= t ? 1 : 0;
+                    if (predicted === this._logActualY[i]) correct++;
+                }
+                this.logAccuracyAtThreshold = (correct / this._logPredProbs.length * 100).toFixed(1) + '%';
+            },
+
+            logRenderChart() {
+                const ctx = document.getElementById('logChart');
+                if (!ctx || !this._logSigmoid) return;
+                if (logChart) logChart.destroy();
+                const scatter = this._logScatterX.map((x, i) => ({ x, y: this._logActualY[i] }));
+                const sigmoid = this._logSigmoid.map(p => ({ x: p.x, y: p.y }));
+                const primary = getComputedStyle(document.documentElement).getPropertyValue('--tc-primary').trim() || '#0d6efd';
+
+                logChart = new Chart(ctx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            { label: 'Data (0/1)', data: scatter, backgroundColor: scatter.map(p => p.y >= 0.5 ? '#198754' : '#dc3545'), pointRadius: 5 },
+                            { label: 'Sigmoid', data: sigmoid, showLine: true, borderColor: primary, borderWidth: 2, pointRadius: 0, tension: 0.3 },
+                        ],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+                        scales: {
+                            x: { title: { display: true, text: 'X' } },
+                            y: { title: { display: true, text: 'P(Y=1)' }, min: -0.05, max: 1.05 },
+                        },
+                    },
+                    plugins: [{
+                        id: 'thresholdLine',
+                        afterDraw: (chart) => {
+                            const { ctx: c, chartArea: { left, right }, scales: { y } } = chart;
+                            const py = y.getPixelForValue(this.logThreshold);
+                            c.save();
+                            c.strokeStyle = '#ffc107';
+                            c.lineWidth = 1.5;
+                            c.setLineDash([5, 3]);
+                            c.beginPath(); c.moveTo(left, py); c.lineTo(right, py); c.stroke();
+                            c.fillStyle = '#ffc107';
+                            c.font = '10px sans-serif';
+                            c.textAlign = 'right';
+                            c.fillText('t=' + this.logThreshold.toFixed(2), right - 5, py - 5);
+                            c.restore();
+                        }
+                    }],
+                });
+            },
         };
     }
 </script>

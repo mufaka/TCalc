@@ -7,6 +7,7 @@
     <title>@ViewData["Title"] - TCalc</title>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css" integrity="sha384-5TcZemv2l/9On385z///+d7MSYlvIEw9FuZTIdZ14vJLqWphw7e7ZPuOiCHJcFCP" crossorigin="anonymous" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/TCalc.Web.styles.css" asp-append-version="true" />
     <script>
@@ -39,7 +40,18 @@
                         <li><a class="tc-pill @(pageName == "/Graphing" ? "active" : "")" asp-page="/Graphing">Graphing</a></li>
                         <li><a class="tc-pill @(pageName == "/Geometry" ? "active" : "")" asp-page="/Geometry">Geometry</a></li>
                         <li><a class="tc-pill @(pageName == "/Statistics" ? "active" : "")" asp-page="/Statistics">Statistics</a></li>
-                        <li><a class="tc-pill @(pageName == "/Probability" ? "active" : "")" asp-page="/Probability">Probability</a></li>
+                        <li class="dropdown">
+                            <a class="tc-pill dropdown-toggle @(pageName == "/Probability" || pageName == "/Distributions" || pageName == "/Simulation" || pageName == "/Inference" ? "active" : "")"
+                               href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Probability &amp; Stats
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item @(pageName == "/Probability" ? "active" : "")" asp-page="/Probability">🎲 Probability</a></li>
+                                <li><a class="dropdown-item @(pageName == "/Distributions" ? "active" : "")" asp-page="/Distributions">📊 Distributions</a></li>
+                                <li><a class="dropdown-item @(pageName == "/Simulation" ? "active" : "")" asp-page="/Simulation">🎯 Simulation</a></li>
+                                <li><a class="dropdown-item @(pageName == "/Inference" ? "active" : "")" asp-page="/Inference">🔍 Inference</a></li>
+                            </ul>
+                        </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li><a class="tc-pill @(pageName == "/Dashboard" ? "active" : "")" asp-page="/Dashboard">Dashboard</a></li>
@@ -79,6 +91,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js" integrity="sha384-cMkvdD8LoxVzGF/RPUKAcvmm49FbqDnRDK4dYXiA4FUurkHXTFb4JSmG0YQzIos" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrKkHb1AEGyjBvaBNOFEFDbOFjkMRHLMTtWGfVsSk/bakSRzDFJsxDIF6qGRj" crossorigin="anonymous"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script>
         // Haptic feedback on calculator button taps (mobile)

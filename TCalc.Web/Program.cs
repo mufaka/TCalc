@@ -28,6 +28,9 @@ builder.Services.AddSingleton<IGeometryService, GeometryService>();
 builder.Services.AddSingleton<IStatisticsService, StatisticsService>();
 builder.Services.AddSingleton<IRegressionService, RegressionService>();
 builder.Services.AddSingleton<IProbabilityService, ProbabilityService>();
+builder.Services.AddSingleton<ISimulationService, SimulationService>();
+builder.Services.AddSingleton<IInferenceService, InferenceService>();
+builder.Services.AddSingleton<ITimeSeriesService, TimeSeriesService>();
 builder.Services.AddScoped<IDataSetService, DataSetService>();
 
 builder.Services.AddRazorPages();

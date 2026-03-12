@@ -1,0 +1,42 @@
+﻿@*
+    Shared Teaching Callout Partial — §6.1
+
+    A collapsible "💡 Learn" panel with consistent styling across all pages.
+
+    Required ViewData:
+        "Id"    — unique HTML id for the collapse target (e.g. "bayesianLearn")
+        "Title" — short title shown on the toggle button (e.g. "How Bayesian Updating Works")
+        "Body"  — HTML string with the teaching content
+
+    Optional ViewData:
+        "CssClass" — override the card class (default: "prob-teach-card")
+                     Use "dist-teach-card", "sim-teach-card", or "inf-teach-card"
+                     to match page-specific naming conventions.
+
+    Usage:
+        <partial name="_TeachingCallout" view-data='@(new ViewDataDictionary(ViewData) {
+            { "Id", "bayesianLearn" },
+            { "Title", "How Bayesian Updating Works" },
+            { "CssClass", "inf-teach-card" },
+            { "Body", "<strong>Posterior ∝ Likelihood × Prior</strong><p>More data makes the prior less influential.</p>" }
+        })' />
+*@
+
+@{
+    var calloutId = ViewData["Id"]?.ToString() ?? "learnCallout";
+    var title = ViewData["Title"]?.ToString() ?? "Learn";
+    var cssClass = ViewData["CssClass"]?.ToString() ?? "prob-teach-card";
+    var body = ViewData["Body"]?.ToString() ?? "";
+}
+
+<div class="mt-3">
+    <button type="button" class="teach-toggle-btn"
+            data-bs-toggle="collapse" data-bs-target="#@calloutId">
+        💡 Learn — @title
+    </button>
+    <div class="collapse mt-2" id="@calloutId">
+        <div class="@cssClass">
+            @Html.Raw(body)
+        </div>
+    </div>
+</div>
