@@ -113,11 +113,31 @@ public class GraphingServiceTests
     }
 
     [Fact]
+    public void GeneratePoints_StopsAtMaximumPointLimit()
+    {
+        var result = _service.GeneratePoints("x", 0, 20_000, 1);
+
+        Assert.True(result.Success);
+        Assert.Equal(10_000, result.TotalPoints);
+        Assert.Equal(10_000, result.Points.Count);
+        Assert.Equal(0.0, result.Points[0].X);
+        Assert.Equal(9_999.0, result.Points[^1].X);
+        Assert.Equal(9_999.0, result.Points[^1].Y);
+    }
+
+    [Fact]
     public void SubstituteX_DoesNotReplaceInsideFunctionNames()
     {
         // "exp(x)" should not become "e(value)p(value)"
         string result = GraphingService.SubstituteX("exp(x)", 2);
         Assert.Equal("exp((2))", result);
+    }
+
+    [Fact]
+    public void SubstituteX_ReplacesUppercaseX()
+    {
+        string result = GraphingService.SubstituteX("X+x", 3);
+        Assert.Equal("(3)+(3)", result);
     }
 
     [Fact]
@@ -185,6 +205,17 @@ public class GraphingServiceTests
     }
 
     [Fact]
+    public void EvaluateInequality_ZeroStep_UsesFallbackSampling()
+    {
+        var result = _service.EvaluateInequality("y < x", -1, 1, 0, -10, 10);
+
+        Assert.True(result.Success);
+        Assert.True(result.IsInequality);
+        Assert.Equal("<", result.Operator);
+        Assert.True(result.BoundaryPoints.Count >= 500);
+    }
+
+    [Fact]
     public void FindInequalityOperator_SkipsInsideParentheses()
     {
         // The < inside parentheses should not be found
@@ -193,6 +224,13 @@ public class GraphingServiceTests
         // The inner comma-delimited stuff shouldn't confuse it, but actually there's
         // no < inside the parens here. Let's verify the outer one.
         Assert.Equal("max(x, 3) ".Length, idx);
+    }
+
+    [Fact]
+    public void FindInequalityOperator_IgnoresOperatorsInsideParentheses()
+    {
+        int idx = GraphingService.FindInequalityOperator("(x < 3)", "<");
+        Assert.Equal(-1, idx);
     }
 
     [Fact]
@@ -205,6 +243,35 @@ public class GraphingServiceTests
         Assert.Equal("<=", result.Operator);
         Assert.True(result.BoundaryInclusive);
         Assert.Equal("below", result.FillDirection);
+    }
+
+    [Fact]
+    public void EvaluateInequality_NonYLeftSide_ReturnsSplitExpressionsAndBoundary()
+    {
+        var result = _service.EvaluateInequality("x^2 < x+1", -1, 1, 1, -10, 10);
+
+        Assert.True(result.Success);
+        Assert.True(result.IsInequality);
+        Assert.Equal("x^2", result.LeftExpression);
+        Assert.Equal("x+1", result.RightExpression);
+        Assert.Equal("above", result.FillDirection);
+        Assert.Collection(
+            result.BoundaryPoints,
+            point =>
+            {
+                Assert.Equal(-1.0, point.X);
+                Assert.Equal(0.0, point.Y);
+            },
+            point =>
+            {
+                Assert.Equal(0.0, point.X);
+                Assert.Equal(1.0, point.Y);
+            },
+            point =>
+            {
+                Assert.Equal(1.0, point.X);
+                Assert.Equal(2.0, point.Y);
+            });
     }
 
     // ─── §6C Conic section generation ─────────────────────────
@@ -232,6 +299,19 @@ public class GraphingServiceTests
     }
 
     [Fact]
+    public void GenerateConicPoints_Circle_UsesDefaultParameters()
+    {
+        var result = _service.GenerateConicPoints("circle", new());
+
+        Assert.True(result.Success);
+        Assert.Equal("circle", result.ConicType);
+        Assert.Equal("(x − 0)² + (y − 0)² = 1", result.Equation);
+        Assert.Equal(1.0, result.Series[0][0].X);
+        Assert.Equal(0.0, result.Series[0][0].Y);
+        Assert.Contains(result.Features, f => f.Label == "Center" && f.X == 0 && f.Y == 0);
+    }
+
+    [Fact]
     public void GenerateConicPoints_Ellipse_HasFoci()
     {
         var result = _service.GenerateConicPoints("ellipse", new() { ["h"] = 0, ["k"] = 0, ["a"] = 5, ["b"] = 3 });
@@ -244,6 +324,16 @@ public class GraphingServiceTests
     }
 
     [Fact]
+    public void GenerateConicPoints_Ellipse_VerticalMajorAxis_FociLieOnYAxis()
+    {
+        var result = _service.GenerateConicPoints("ellipse", new() { ["h"] = 0, ["k"] = 0, ["a"] = 3, ["b"] = 5 });
+
+        Assert.True(result.Success);
+        Assert.Contains(result.Features, f => f.Label == "Focus 1" && f.X == 0 && f.Y == 4);
+        Assert.Contains(result.Features, f => f.Label == "Focus 2" && f.X == 0 && f.Y == -4);
+    }
+
+    [Fact]
     public void GenerateConicPoints_Parabola_HasVertexAndFocus()
     {
         var result = _service.GenerateConicPoints("parabola", new() { ["h"] = 0, ["k"] = 0, ["a"] = 1 });
@@ -253,6 +343,17 @@ public class GraphingServiceTests
         Assert.Contains(result.Features, f => f.Label == "Vertex");
         Assert.Contains(result.Features, f => f.Label == "Focus");
         Assert.Contains(result.Features, f => f.Label.StartsWith("Directrix"));
+    }
+
+    [Fact]
+    public void GenerateConicPoints_Parabola_NegativeCoefficient_PlacesFocusBelowVertex()
+    {
+        var result = _service.GenerateConicPoints("parabola", new() { ["h"] = 2, ["k"] = 3, ["a"] = -1 });
+
+        Assert.True(result.Success);
+        Assert.Contains(result.Features, f => f.Label == "Vertex" && f.X == 2 && f.Y == 3);
+        Assert.Contains(result.Features, f => f.Label == "Focus" && f.X == 2 && f.Y == 2.75);
+        Assert.Contains(result.Features, f => f.Label == "Directrix (y)" && f.X == 2 && f.Y == 3.25);
     }
 
     [Fact]
@@ -272,6 +373,16 @@ public class GraphingServiceTests
         Assert.Equal(2, result.Series.Count); // right branch + left branch
         Assert.Contains(result.Features, f => f.Label == "Vertex 1");
         Assert.Contains(result.Features, f => f.Label == "Vertex 2");
+    }
+
+    [Fact]
+    public void GenerateConicPoints_Hyperbola_ComputesFocusPositions()
+    {
+        var result = _service.GenerateConicPoints("hyperbola", new() { ["h"] = 0, ["k"] = 0, ["a"] = 3, ["b"] = 4 });
+
+        Assert.True(result.Success);
+        Assert.Contains(result.Features, f => f.Label == "Focus 1" && f.X == 5 && f.Y == 0);
+        Assert.Contains(result.Features, f => f.Label == "Focus 2" && f.X == -5 && f.Y == 0);
     }
 
     [Fact]
